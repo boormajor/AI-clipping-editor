@@ -91,3 +91,71 @@ func TestEscapeAss(t *testing.T) {
 		t.Fatal(s)
 	}
 }
+
+func TestUnescapeSpeakerMarkers(t *testing.T) {
+	data := []byte("1\n00:00:00,000 --> 00:00:02,000\n&amp;gt;&amp;gt; Why does topical authority matter?\n")
+	cues, _, err := ParseTranscript("episode.srt", data)
+	if err != nil || len(cues) != 1 {
+		t.Fatalf("bad transcript: %v %#v", err, cues)
+	}
+	if cues[0].Text != "Why does topical authority matter?" {
+		t.Fatalf("escaped title cue: %q", cues[0].Text)
+	}
+}
+func TestASSHonorsCueBoundariesAndOffset(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "captions.ass")
+	cfg := Defaults()
+	cfg.Width = 360
+	cfg.Height = 640
+	cfg.CaptionFont = "Montserrat"
+	cfg.CaptionSize = 38
+	cfg.CaptionOffset = .45
+	cue := []Cue{{Start: 1, End: 4, Text: "The first sentence aligns with the timestamp exactly."}}
+	if err := WriteASS(file, cue, Clip{Start: 0, End: 6, CaptionStyle: "bold"}, cfg); err != nil {
+		t.Fatal(err)
+	}
+	out, _ := os.ReadFile(file)
+	if !strings.Contains(string(out), "0:00:01.45,0:00:04.45") {
+		t.Fatalf("timing drift: %s", out)
+	}
+	if strings.Count(string(out), "Dialogue:") != 1 {
+		t.Fatalf("should not invent word boundaries: %s", out)
+	}
+	if !strings.Contains(string(out), "Montserrat,38") {
+		t.Fatal("custom font/size ignored")
+	}
+}
+func TestDualSpeakerRender(t *testing.T) {
+	if _, e := exec.LookPath("ffmpeg"); e != nil {
+		t.Skip("FFmpeg missing")
+	}
+	dir := t.TempDir()
+	src := filepath.Join(dir, "pair.mp4")
+	cmd := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=25:d=2", "-f", "lavfi", "-i", "sine=frequency=500:duration=2", "-c:v", "libx264", "-c:a", "aac", "-shortest", src)
+	if out, e := cmd.CombinedOutput(); e != nil {
+		t.Fatalf("input: %v %s", e, out)
+	}
+	cfg := Defaults()
+	cfg.Width = 360
+	cfg.Height = 640
+	cfg.FPS = 25
+	cfg.GPU = false
+	p := Project{VideoPath: src, OutputDir: filepath.Join(dir, "out"), Duration: 2, Cues: []Cue{{Start: 0, End: 2, Text: "Testing dual person layout"}}, Config: cfg}
+	c := Clip{ID: "dual", Start: 0, End: 2, Layout: "two-up", Captions: true, CaptionStyle: "minimal"}
+	rendered, logs, err := Render(context.Background(), p, c)
+	if err != nil {
+		t.Fatalf("render failed: %v %s", err, logs)
+	}
+	if _, e := os.Stat(rendered); e != nil {
+		t.Fatal(e)
+	}
+}
+
+func TestCleanClipTitle(t *testing.T) {
+	for _, input := range []string{"&gt;&gt; How do EMDs affect topical authority?", "&amp;gt;&amp;gt; How do EMDs affect topical authority?"} {
+		title := cleanTitle(input)
+		if title != "How do EMDs affect topical authority?" {
+			t.Fatalf("dirty title: %q", title)
+		}
+	}
+}
