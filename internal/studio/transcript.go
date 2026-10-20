@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"html"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -115,7 +116,9 @@ func normalizeCues(c []Cue) []Cue {
 	sort.Slice(c, func(i, j int) bool { return c[i].Start < c[j].Start })
 	out := make([]Cue, 0, len(c))
 	for _, a := range c {
-		a.Text = strings.TrimSpace(a.Text)
+		// Normalize HTML-escaped transcripts (including repeated &gt;&gt; speaker markers).
+		a.Text = strings.TrimSpace(html.UnescapeString(html.UnescapeString(a.Text)))
+		a.Text = strings.TrimSpace(strings.TrimLeft(strings.TrimPrefix(a.Text, ">>"), " >"))
 		if a.Start >= 0 && a.End > a.Start && a.Text != "" {
 			out = append(out, a)
 		}
