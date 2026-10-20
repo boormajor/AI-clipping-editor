@@ -8,11 +8,25 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"html"
+	"regexp"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
 )
+
+var speakerMarker = regexp.MustCompile(`(?i)^\s*(?:>>+|speaker\s*\d+\s*:)\s*`)
+
+func cleanTitle(s string) string {
+	s = html.UnescapeString(html.UnescapeString(strings.TrimSpace(s)))
+	s = speakerMarker.ReplaceAllString(s, "")
+	s = strings.Trim(s, " \"\u201c\u201d.,!:-")
+	if len(s) > 85 {
+		s = strings.TrimSpace(s[:82]) + "…"
+	}
+	return s
+}
 
 type Candidate struct {
 	ID    int     `json:"id"`
@@ -101,6 +115,7 @@ func SelectHighlights(ctx context.Context, cues []Cue, n int, minS, maxS float64
 		return nil, errors.New("no timestamped transcript passages are long enough; supply SRT/VTT or align a plain transcript first")
 	}
 	chosen := pool
+	metas := map[int]struct{ Title, Reason string }{}
 	if provider.Provider != "local" && provider.Provider != "heuristic" && provider.Provider != "" {
 		shortlist := pool
 		if len(shortlist) > 35 {
@@ -112,12 +127,17 @@ func SelectHighlights(ctx context.Context, cues []Cue, n int, minS, maxS float64
 			Max          int         `json:"max_clips"`
 		}{shortlist, instructions, n}
 		b, _ := json.Marshal(request)
-		prompt := "You are a sharp short-form podcast producer. Select the strongest standalone clips from provided timed transcript candidates. Prefer compelling hooks, specificity, clarity, surprising ideas, and useful actionable information; avoid dull introductions and mid-sentence starts. Do not invent timestamps or text. Reply with ONLY a JSON object like {\"ids\":[2,4,1]} using only candidate IDs. Select at most max_clips. Input:\n" + string(b)
+		prompt := "You are the short-form EDITOR and quality reviewer for a marketing/SEO guest podcast. New viewers have no context. Select ONLY moments that stand alone: the hook introduces WHO or WHAT is being discussed, explains jargon if needed, and makes a specific promise. Reject excerpts starting mid-thought (like 'and that's why', 'this thing', 'he said') without identifying their referent. It is better to return fewer clips than confusing clips. Write a meaningful accurate title (max 70 chars) and a short reason naming the context. Never invent quotations, details, timestamps, or speakers. Output ONLY valid JSON of this exact shape: {\"clips\":[{\"id\":2,\"title\":\"Why Exact Match Domains Still Matter\",\"reason\":\"Introduces the EMD question and explains its answer.\"}]}. Use only candidate IDs provided, maximum max_clips. Input:\n" + string(b)
 		response, err := AskModel(ctx, provider, prompt)
 		if err != nil {
 			return nil, fmt.Errorf("AI request failed (local fallback available by selecting Heuristic): %w", err)
 		}
 		var selection struct {
+			Clips []struct {
+				ID     int    `json:"id"`
+				Title  string `json:"title"`
+				Reason string `json:"reason"`
+			} `json:"clips"`
 			IDs []int `json:"ids"`
 		}
 		clean := strings.TrimSpace(response)
@@ -126,6 +146,12 @@ func SelectHighlights(ctx context.Context, cues []Cue, n int, minS, maxS float64
 		clean = strings.TrimSuffix(clean, "```")
 		if err = json.Unmarshal([]byte(strings.TrimSpace(clean)), &selection); err != nil {
 			return nil, fmt.Errorf("AI returned invalid clip selection JSON: %w", err)
+		}
+		if len(selection.Clips) > 0 {
+			for _, row := range selection.Clips {
+				selection.IDs = append(selection.IDs, row.ID)
+				metas[row.ID] = struct{ Title, Reason string }{cleanTitle(row.Title), strings.TrimSpace(row.Reason)}
+			}
 		}
 		chosen = nil
 		seen := map[int]bool{}
@@ -147,11 +173,17 @@ func SelectHighlights(ctx context.Context, cues []Cue, n int, minS, maxS float64
 	}
 	var clips []Clip
 	for i, c := range chosen {
-		summary := strings.TrimSpace(c.Text)
-		if len(summary) > 74 {
-			summary = summary[:74] + "…"
+		summary := cleanTitle(c.Text)
+		reason := "Review the opening and ending: this clip has not passed a full context audit."
+		if v, ok := metas[c.ID]; ok {
+			if v.Title != "" {
+				summary = v.Title
+			}
+			if v.Reason != "" {
+				reason = v.Reason
+			}
 		}
-		clips = append(clips, Clip{ID: fmt.Sprintf("clip-%02d", i+1), Title: summary, Start: c.Start, End: c.End, Score: math.Round(c.Score*10) / 10, Reason: "Strong standalone transcript passage. Review the opening and ending before publishing.", Selected: true, Pan: .5, Captions: true, CaptionStyle: "bold"})
+		clips = append(clips, Clip{ID: fmt.Sprintf("clip-%02d", i+1), Title: summary, Start: c.Start, End: c.End, Score: math.Round(c.Score*10) / 10, Reason: reason, Selected: true, Pan: .5, Layout: "focus", Captions: true, CaptionStyle: "bold"})
 	}
 	return clips, nil
 }
