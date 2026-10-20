@@ -73,6 +73,7 @@ func main() {
 	mux.HandleFunc("POST /api/save", a.save)
 	mux.HandleFunc("POST /api/open", a.open)
 	mux.HandleFunc("POST /api/pick", a.pick)
+	mux.HandleFunc("POST /api/vision", a.reviewVision)
 	mux.HandleFunc("POST /api/stock/search", a.searchStock)
 	mux.HandleFunc("POST /api/stock/download", a.downloadStock)
 	mux.HandleFunc("GET /api/media", a.media)
