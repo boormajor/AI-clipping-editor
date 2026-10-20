@@ -15,7 +15,8 @@ type Clip struct {
 	Score        float64 `json:"score"`
 	Reason       string  `json:"reason"`
 	Selected     bool    `json:"selected"`
-	Pan          float64 `json:"pan"` // 0 is left, 0.5 center, 1 right
+	Pan          float64 `json:"pan"`    // 0 is left, 0.5 center, 1 right
+	Layout       string  `json:"layout"` // focus or two-up; two-up assumes left/right source split
 	Captions     bool    `json:"captions"`
 	CaptionStyle string  `json:"captionStyle"`
 	Callout      string  `json:"callout"`
@@ -27,21 +28,24 @@ type Broll struct {
 	Duration float64 `json:"duration"`
 }
 type Config struct {
-	Preset       string `json:"preset"`
-	Captions     bool   `json:"captions"`
-	Reframe      bool   `json:"reframe"`
-	Zoom         bool   `json:"zoom"`
-	Broll        bool   `json:"broll"`
-	Stock        bool   `json:"stock"`
-	Graphics     bool   `json:"graphics"`
-	Transitions  bool   `json:"transitions"`
-	Sfx          bool   `json:"sfx"`
-	CaptionStyle string `json:"captionStyle"`
-	Width        int    `json:"width"`
-	Height       int    `json:"height"`
-	FPS          int    `json:"fps"`
-	GPU          bool   `json:"gpu"`
-	Instructions string `json:"instructions"`
+	Preset        string  `json:"preset"`
+	Captions      bool    `json:"captions"`
+	Reframe       bool    `json:"reframe"`
+	Zoom          bool    `json:"zoom"`
+	Broll         bool    `json:"broll"`
+	Stock         bool    `json:"stock"`
+	Graphics      bool    `json:"graphics"`
+	Transitions   bool    `json:"transitions"`
+	Sfx           bool    `json:"sfx"`
+	CaptionStyle  string  `json:"captionStyle"`
+	CaptionFont   string  `json:"captionFont"`
+	CaptionSize   int     `json:"captionSize"`
+	CaptionOffset float64 `json:"captionOffset"` // seconds; shift transcripts to sync with soundtrack
+	Width         int     `json:"width"`
+	Height        int     `json:"height"`
+	FPS           int     `json:"fps"`
+	GPU           bool    `json:"gpu"`
+	Instructions  string  `json:"instructions"`
 }
 type Project struct {
 	Name           string    `json:"name"`
@@ -62,5 +66,5 @@ type ProviderConfig struct {
 }
 
 func Defaults() Config {
-	return Config{Preset: "simple", Captions: true, Reframe: true, CaptionStyle: "bold", Width: 1080, Height: 1920, FPS: 30, GPU: true}
+	return Config{Preset: "simple", Captions: true, Reframe: true, CaptionStyle: "bold", CaptionFont: "Arial", CaptionSize: 76, Width: 1080, Height: 1920, FPS: 30, GPU: true}
 }
