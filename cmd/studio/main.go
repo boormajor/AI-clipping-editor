@@ -25,6 +25,7 @@ import (
 )
 
 type application struct {
+	auth    *chatAuth
 	mu      sync.Mutex
 	project studio.Project
 	jobs    map[string]*job
@@ -50,9 +51,19 @@ func main() {
 	if *host != "127.0.0.1" {
 		log.Fatal("only localhost binding is supported for protecting local video files")
 	}
-	a := &application{project: studio.Project{Name: "Untitled Podcast", Config: studio.Defaults(), Clips: []studio.Clip{}, Cues: []studio.Cue{}}, jobs: map[string]*job{}}
+	auth, authErr := newChatAuth()
+	if authErr != nil {
+		log.Fatal("ChatGPT credential storage: ", authErr)
+	}
+	a := &application{auth: auth, project: studio.Project{Name: "Untitled Podcast", Config: studio.Defaults(), Clips: []studio.Clip{}, Cues: []studio.Cue{}}, jobs: map[string]*job{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/status", a.status)
+	mux.HandleFunc("GET /api/auth/status", a.authStatus)
+	mux.HandleFunc("POST /api/auth/chatgpt/start", a.authChatGPTStart)
+	mux.HandleFunc("GET /api/auth/chatgpt/models", a.authChatGPTModels)
+	mux.HandleFunc("POST /api/auth/chatgpt/disconnect", a.authChatGPTDisconnect)
+	mux.HandleFunc("GET /api/auth/claude/status", a.authClaudeStatus)
+	mux.HandleFunc("POST /api/auth/claude/login", a.authClaudeLogin)
 	mux.HandleFunc("POST /api/load", a.load)
 	mux.HandleFunc("POST /api/config", a.configure)
 	mux.HandleFunc("POST /api/analyze", a.analyze)
@@ -136,7 +147,7 @@ func (a *application) status(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	p := a.project
 	a.mu.Unlock()
-	reply(w, map[string]any{"project": p, "tools": map[string]bool{"ffmpeg": has("ffmpeg"), "ffprobe": has("ffprobe"), "pdftotext": has("pdftotext"), "ollama": has("ollama"), "whisper": has("whisper-cli")}, "version": "0.1.0-alpha"})
+	reply(w, map[string]any{"project": p, "tools": map[string]bool{"ffmpeg": has("ffmpeg"), "ffprobe": has("ffprobe"), "pdftotext": has("pdftotext"), "ollama": has("ollama"), "whisper": has("whisper-cli")}, "version": "0.2.0-alpha"})
 }
 func has(v string) bool { _, e := exec.LookPath(v); return e == nil }
 func (a *application) load(w http.ResponseWriter, r *http.Request) {
@@ -226,6 +237,26 @@ func (a *application) analyze(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 110*time.Second)
 	defer cancel()
+	if q.Provider.Provider == "chatgpt" {
+		token, err := a.auth.accessToken(ctx)
+		if err != nil {
+			fail(w, 401, err.Error())
+			return
+		}
+		q.Provider.APIKey = token // server-side only: never exposed to the browser
+		if strings.TrimSpace(q.Provider.Model) == "" {
+			models, err := a.auth.models(ctx)
+			if err != nil {
+				fail(w, 400, "Could not list models for ChatGPT plan: "+err.Error())
+				return
+			}
+			if len(models) == 0 {
+				fail(w, 400, "No eligible ChatGPT models are available for this account")
+				return
+			}
+			q.Provider.Model = models[0]["slug"]
+		}
+	}
 	clips, e := studio.SelectHighlights(ctx, p.Cues, q.Count, q.Min, q.Max, q.Provider, p.Config.Instructions)
 	if e != nil {
 		fail(w, 422, e.Error())
@@ -504,4 +535,66 @@ func (a *application) media(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "private, no-store")
 	http.ServeFile(w, r, path)
+}
+
+// Subscription account access stays exclusively within the local Go process.
+func (a *application) authStatus(w http.ResponseWriter, r *http.Request) { reply(w, a.auth.status()) }
+func (a *application) authChatGPTStart(w http.ResponseWriter, r *http.Request) {
+	url, err := a.auth.start()
+	if err != nil {
+		fail(w, 400, err.Error())
+		return
+	}
+	reply(w, map[string]string{"url": url})
+	go openSignInBrowser(url)
+}
+func (a *application) authChatGPTModels(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	models, e := a.auth.models(ctx)
+	if e != nil {
+		fail(w, 400, e.Error())
+		return
+	}
+	reply(w, map[string]any{"models": models})
+}
+func (a *application) authChatGPTDisconnect(w http.ResponseWriter, r *http.Request) {
+	if e := a.auth.disconnect(); e != nil {
+		fail(w, 500, e.Error())
+		return
+	}
+	reply(w, map[string]bool{"ok": true})
+}
+func (a *application) authClaudeStatus(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	connected, message := studio.ClaudeCodeStatus(ctx)
+	reply(w, map[string]any{"connected": connected, "message": message})
+}
+func openSignInBrowser(url string) {
+	switch runtime.GOOS {
+	case "windows":
+		_ = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "darwin":
+		_ = exec.Command("open", url).Start()
+	default:
+		_ = exec.Command("xdg-open", url).Start()
+	}
+}
+
+func (a *application) authClaudeLogin(w http.ResponseWriter, r *http.Request) {
+	if !has("claude") {
+		fail(w, 400, "Install the official Claude Code CLI first: https://code.claude.com/docs/en/setup")
+		return
+	}
+	if runtime.GOOS != "windows" {
+		fail(w, 400, "Open a terminal and run: claude auth login")
+		return
+	}
+	// Fixed command only. No caller-supplied strings enter the shell.
+	if err := exec.Command("cmd", "/c", "start", "", "cmd", "/k", "claude", "auth", "login").Start(); err != nil {
+		fail(w, 500, "Unable to open Claude login terminal: "+err.Error())
+		return
+	}
+	reply(w, map[string]bool{"ok": true})
 }
