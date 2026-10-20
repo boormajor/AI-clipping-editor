@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 func Probe(video string) (float64, error) {
@@ -35,55 +36,84 @@ func EscapeAss(s string) string {
 	s = strings.ReplaceAll(s, "\n", " ")
 	return s
 }
+
+// validCaptionFont limits unsafe or unsupported characters in ASS style definitions.
+func validCaptionFont(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "Arial"
+	}
+	if len(s) > 70 {
+		s = s[:70]
+	}
+	for _, r := range s {
+		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == ' ' || r == '-') {
+			return "Arial"
+		}
+	}
+	return s
+}
+
+// WriteASS keeps original cue boundaries. It never invents word timing from SRT.
+// Word-level animations require a separate real word-alignment pass.
 func WriteASS(path string, cues []Cue, c Clip, config Config) error {
-	fontSize := 76
+	fontSize := config.CaptionSize
+	if fontSize < 24 || fontSize > 130 {
+		fontSize = 76
+	}
 	color := "&H00FFFFFF"
 	outline := 4
-	alignment := 2
 	switch c.CaptionStyle {
 	case "minimal":
-		fontSize = 58
 		outline = 2
-	case "yellow":
+	case "yellow", "highlight", "karaoke":
 		color = "&H0000EFFF"
 	case "podcast":
-		fontSize = 68
-	case "highlight":
-		color = "&H0000FFFF"
-	case "karaoke":
-		color = "&H0000FFFF"
+		outline = 3
 	}
-	// Uses ASS subtitle styling with per-cue event timings from the imported transcript.
+	font := validCaptionFont(config.CaptionFont)
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("[Script Info]\nScriptType: v4.00+\nPlayResX: %d\nPlayResY: %d\nWrapStyle: 2\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\nStyle: Default,Arial,%d,%s,&H00FFFFFF,&H00000000,&HAA000000,-1,0,0,0,100,100,0,0,1,%d,1,%d,68,68,190,1\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n", config.Width, config.Height, fontSize, color, outline, alignment))
+	b.WriteString(fmt.Sprintf("[Script Info]\nScriptType: v4.00+\nPlayResX: %d\nPlayResY: %d\nWrapStyle: 0\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\nStyle: Default,%s,%d,%s,&H00FFFFFF,&H00000000,&H99000000,-1,0,0,0,100,100,0,0,1,%d,1,2,64,64,240,1\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n", config.Width, config.Height, font, fontSize, color, outline))
 	for _, cue := range cues {
-		if cue.End <= c.Start || cue.Start >= c.End {
+		// Positive offsets delay captions; negative offsets move them earlier.
+		start := cue.Start + config.CaptionOffset - c.Start
+		end := cue.End + config.CaptionOffset - c.Start
+		if end <= 0 || start >= c.End-c.Start {
 			continue
 		}
-		start := cue.Start - c.Start
 		if start < 0 {
 			start = 0
 		}
-		end := cue.End - c.Start
 		if end > c.End-c.Start {
 			end = c.End - c.Start
 		}
 		if end <= start {
 			continue
 		}
-		words := strings.Fields(cue.Text)
-		// Split long segments into short readable caption chunks, using proportional timing if word timings aren't available.
-		for i := 0; i < len(words); i += 7 {
-			j := i + 7
-			if j > len(words) {
-				j = len(words)
-			}
-			a := start + (end-start)*float64(i)/float64(len(words))
-			z := start + (end-start)*float64(j)/float64(len(words))
-			b.WriteString(fmt.Sprintf("Dialogue: 0,%s,%s,Default,,0,0,0,,%s\n", AssTime(a), AssTime(z), EscapeAss(strings.Join(words[i:j], " "))))
-		}
+		b.WriteString(fmt.Sprintf("Dialogue: 0,%s,%s,Default,,0,0,0,,%s\n", AssTime(start), AssTime(end), EscapeAss(cue.Text)))
 	}
 	return os.WriteFile(path, []byte(b.String()), 0600)
+}
+
+// videoChain builds a filter on a *single finished video*.
+// two-up is explicit because it assumes the guests occupy the left and right halves.
+func videoChain(cfg Config, c Clip) string {
+	prefix := "fps=" + strconv.Itoa(cfg.FPS)
+	if cfg.Reframe && c.Layout == "two-up" {
+		h := cfg.Height / 2
+		return fmt.Sprintf("%s,split=2[sideL][sideR];[sideL]crop=iw/2:ih:0:0,scale=w=%d:h=%d:force_original_aspect_ratio=increase,crop=%d:%d[top];[sideR]crop=iw/2:ih:iw/2:0,scale=w=%d:h=%d:force_original_aspect_ratio=increase,crop=%d:%d[bottom];[top][bottom]vstack=inputs=2,setsar=1", prefix, cfg.Width, h, cfg.Width, h, cfg.Width, h, cfg.Width, h)
+	}
+	if cfg.Reframe {
+		pan := c.Pan
+		if pan < 0 {
+			pan = 0
+		}
+		if pan > 1 {
+			pan = 1
+		}
+		return fmt.Sprintf("%s,scale=w=%d:h=%d:force_original_aspect_ratio=increase,crop=%d:%d:(iw-%d)*%.4f:(ih-%d)/2,setsar=1", prefix, cfg.Width, cfg.Height, cfg.Width, cfg.Height, cfg.Width, pan, cfg.Height)
+	}
+	return fmt.Sprintf("%s,scale=w=%d:h=%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1", prefix, cfg.Width, cfg.Height, cfg.Width, cfg.Height)
 }
 func Render(ctx context.Context, p Project, c Clip) (string, string, error) {
 	if c.End <= c.Start || c.Start < 0 || c.End > p.Duration+.5 {
@@ -124,25 +154,9 @@ func Render(ctx context.Context, p Project, c Clip) (string, string, error) {
 	if e = WriteASS(ass, p.Cues, c, cfg); e != nil {
 		return "", "", e
 	}
-	var f []string
-	// Pan is horizontal focal position, range 0..1. Keep center of interest in the vertical crop.
-	pan := c.Pan
-	if pan < 0 {
-		pan = 0
-	}
-	if pan > 1 {
-		pan = 1
-	}
-	f = append(f, "fps="+strconv.Itoa(cfg.FPS))
-	if cfg.Reframe {
-		scale := fmt.Sprintf("scale=w=%d:h=%d:force_original_aspect_ratio=increase", cfg.Width, cfg.Height)
-		crop := fmt.Sprintf("crop=%d:%d:(iw-%d)*%.4f:(ih-%d)/2", cfg.Width, cfg.Height, cfg.Width, pan, cfg.Height)
-		f = append(f, scale, crop, "setsar=1")
-	} else {
-		f = append(f, fmt.Sprintf("scale=w=%d:h=%d:force_original_aspect_ratio=decrease", cfg.Width, cfg.Height), fmt.Sprintf("pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black", cfg.Width, cfg.Height), "setsar=1")
-	}
-	if cfg.Zoom {
-		f = append(f, fmt.Sprintf("crop=w='iw/(1+0.06*between(t,1.5,3.5))':h='ih/(1+0.06*between(t,1.5,3.5))':x='(iw-ow)/2':y='(ih-oh)/2',scale=%d:%d", cfg.Width, cfg.Height))
+	vf := videoChain(cfg, c)
+	if cfg.Zoom && c.Layout != "two-up" {
+		vf += fmt.Sprintf(",crop=w='iw/(1+0.06*between(t,1.5,3.5))':h='ih/(1+0.06*between(t,1.5,3.5))':x='(iw-ow)/2':y='(ih-oh)/2',scale=%d:%d", cfg.Width, cfg.Height)
 	}
 	var finalFilters []string
 	if cfg.Captions && c.Captions {
@@ -171,7 +185,6 @@ func Render(ctx context.Context, p Project, c Clip) (string, string, error) {
 	for _, a := range overlays {
 		args = append(args, "-stream_loop", "-1", "-i", a.Path)
 	}
-	vf := strings.Join(f, ",")
 	mapVideo := "0:v:0"
 	if len(overlays) == 0 {
 		if len(finalFilters) > 0 {
