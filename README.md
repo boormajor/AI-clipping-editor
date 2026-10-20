@@ -2,7 +2,7 @@
 
 **Local-first podcast clipping studio for Windows** — a free, source-available Go desktop launcher with a polished local GUI, transcript-based highlight discovery, optional Ollama/OpenAI/Claude analysis, manual timeline adjustments, and FFmpeg vertical exports.
 
-> **Status: v0.2.0 alpha.** This is a genuinely executable first build, not a full replacement for professional editors or OpusClip. Features marked *planned* in the GUI are not implemented yet. The project is built around original-media safety: imported footage is never modified. All renders go to a separate output folder.
+> **Status: v0.3.0 alpha.** This is a genuinely executable first build, not a full replacement for professional editors or OpusClip. Features marked *planned* in the GUI are not implemented yet. The project is built around original-media safety: imported footage is never modified. All renders go to a separate output folder.
 
 ## Get started on Windows
 
@@ -41,6 +41,15 @@ If either provider isn't available, choose **Ollama** (free local model) or the 
 ### API key modes
 
 OpenAI API and Anthropic API remain available as *optional* separately billed providers. ChatGPT Plus / Claude Pro do not themselves provide an ordinary API key or unlimited inference. Never paste subscription browser tokens or cookies into an API key field.
+
+## v0.3 improvements (manual review required)
+
+- More context-aware model instructions: clip selection requests a stand-alone hook, an accurate short title, and an explanation. This is a text review, not yet automated visual/audio review.
+- Caption timing preserves exact SRT/VTT cue time boundaries; the editor exposes a **manual global caption offset** for exports created with a shifted transcript. This does **not** fix incorrect source transcriptions or provide word-level alignment.
+- User-selectable font and size for subtitles. Only fonts installed on the rendering PC are available.
+- **Two-up layout** uses the left and right half of the same finished side-by-side podcast recording and stacks them vertically. It is not automatic active-speaker detection; the editor must choose the layout.
+- Optional **local frame inspector** samples three JPEG frames and sends them to an Ollama vision model installed on the PC (default `gemma3:4b`). It recommends a layout and flags obvious cropping risks, but cannot guarantee face visibility, infer speaking order, or verify captions against sound. Cloud-connected ChatGPT/Claude do not receive frames.
+- Simplified interface labels. Visual accuracy still requires editor review of rendered MP4s.
 
 ## Editing controls
 
