@@ -2,7 +2,7 @@
 
 **Local-first podcast clipping studio for Windows** — a free, source-available Go desktop launcher with a polished local GUI, transcript-based highlight discovery, optional Ollama/OpenAI/Claude analysis, manual timeline adjustments, and FFmpeg vertical exports.
 
-> **Status: v0.1.0 alpha.** This is a genuinely executable first build, not a full replacement for professional editors or OpusClip. Features marked *planned* in the GUI are not implemented yet. The project is built around original-media safety: imported footage is never modified. All renders go to a separate output folder.
+> **Status: v0.2.0 alpha.** This is a genuinely executable first build, not a full replacement for professional editors or OpusClip. Features marked *planned* in the GUI are not implemented yet. The project is built around original-media safety: imported footage is never modified. All renders go to a separate output folder.
 
 ## Get started on Windows
 
@@ -10,11 +10,37 @@
 2. **Double-click `Install-and-Run.bat`**. It checks whether `ffmpeg`/`ffprobe` are installed and offers to install the free FFmpeg package with Windows Package Manager (`winget`). Restart the batch file or Windows terminal after installing if PATH has not refreshed.
 3. The batch file starts `PodcastAIStudio.exe`. The app opens in an **Edge app window** (or your default browser if Edge isn't found). Keep the console window open while you work; closing it stops the local app.
 4. In Studio, click **Browse** next to a finished podcast recording and a **timestamped SRT or VTT transcript** (recommended export from Descript). TXT, DOCX, PDF, Markdown, and JSON parsing is available, but the current version cannot safely invent timings for untimed text. See [Transcript formats](#transcript-formats).
-5. Select **AI connections**: built-in heuristic (free and offline), Ollama (free local LLM; install Ollama yourself), OpenAI API, or Anthropic API. API keys are transmitted only for requests you explicitly start and **never saved to the project JSON**.
+5. Select **AI connections**: built-in heuristic, Ollama, **ChatGPT Plus/Pro sign-in**, **Claude Pro/Max via official Claude Code**, OpenAI API, or Anthropic API. API keys remain optional for separately billed API modes, and are **never saved to the project JSON**.
 6. Pick clip count/duration, click **Find best moments**, adjust chosen clips, and click **Render clip**. MP4 files appear in your selected export folder.
 7. Save the project to `podcast-ai-studio.project.json` in the export folder for later editing.
 
 The Windows EXE is **only the application**; external FFmpeg remains a separate free dependency. The included installer helps set it up. No model downloads, stock footage, or paid accounts are included in the EXE.
+
+## Use your $20 subscriptions without adding an API key
+
+### ChatGPT Plus / Pro — official Sign in with ChatGPT
+
+1. In **AI connections**, select **ChatGPT Plus / Pro — Sign in with ChatGPT**.
+2. Click **Continue with ChatGPT**. A secure OpenAI browser login window opens. Approve **ChatGPT plan usage** (not identity-only access).
+3. Return to Studio; the GUI will show your connection and discover models available to your account. Select one from the model input suggestions, then click **Use this AI provider**.
+4. Import a timestamped transcript and click **Find best moments**. The OpenAI subscription request sends *selected transcript candidates* to the official Responses API with `store: false` and `stream: true`.
+
+This uses the public [Sign in with ChatGPT open-source authorization flow](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), including dynamic client registration, PKCE, authorization-code exchange, ID-token signature/nonce validation, scope verification, model discovery, and token refresh. On Windows the profile is encrypted with the current user's DPAPI account key and saved under the Windows user config directory. Authentication takes place on OpenAI's website; never enter your password in Podcast AI Studio. Manage the app's permitted usage through ChatGPT settings. Eligible usage counts against plan limits and may be unavailable for some accounts or regions.
+
+**Security note:** The app accepts only OpenAI's documented public inference endpoint; it does not scrape ChatGPT or re-use browser cookies. You can disconnect its local credentials in the app and revoke access remotely in ChatGPT settings. The initial Windows build has not yet been verified using a live user account.
+
+### Claude Pro / Max — official Claude Code
+
+1. Install [Claude Code](https://code.claude.com/docs/en/setup), then open the AI connections panel and choose **Claude Pro / Max — Claude Code login**.
+2. Click **Open Claude Code login**, or use PowerShell: `claude auth login`. Sign in to your **Claude subscription** account, not Anthropic Console/API billing.
+3. Click **Recheck sign-in**, choose the Claude Code provider and click **Use this AI provider**.
+4. The app calls the official `claude -p` CLI *without tools or persistent sessions*, sends transcript candidate text by standard input, and parses its JSON result. It never copies subscription OAuth tokens. Ensure your Claude Code authentication is using the subscription, not API billing; Anthropic's subscription usage and potential usage-credit rules still apply.
+
+If either provider isn't available, choose **Ollama** (free local model) or the built-in heuristic. Claude Code must be installed separately; the EXE does not bundle it.
+
+### API key modes
+
+OpenAI API and Anthropic API remain available as *optional* separately billed providers. ChatGPT Plus / Claude Pro do not themselves provide an ordinary API key or unlimited inference. Never paste subscription browser tokens or cookies into an API key field.
 
 ## Editing controls
 
@@ -25,7 +51,7 @@ The Windows EXE is **only the application**; external FFmpeg remains a separate 
 | DOCX and PDF extraction | **Partial** | Reads content; timed transcript still required. PDF requires `pdftotext` from Poppler |
 | Automatic plain-text alignment | **Planned** | Will need a locally installed Whisper-based aligner; untimed clips are deliberately blocked |
 | AI highlight suggestions | **Working** | Free heuristic; optional Ollama, OpenAI, Anthropic; human should review selections |
-| AI accounts | **API keys only** | ChatGPT Plus/Claude Pro subscriptions do not automatically provide API credits |
+| AI accounts | **ChatGPT subscription / Claude Code / API keys / local** | OpenAI OSS sign-in and Anthropic official CLI; subject to usage and eligibility. API key modes are separate billing |
 | Adjustable clip count and duration | **Working** | User specifies maximum count and length bounds |
 | Editable clip trim points | **Working** | Numeric in/out and visual transcript timeline handles |
 | Vertical video reframing | **Working, manual focus** | Adjustable horizontal focal point, center by default; does not track faces yet |
