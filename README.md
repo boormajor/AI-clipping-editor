@@ -1,5 +1,3 @@
-> **Repository sync status (2026-10-20):** Initial documentation uploaded. Full source files have **not yet** been uploaded to this GitHub repository. Download the complete source ZIP from the ChatGPT conversation and extract its `podcast-ai-studio` folder before publishing. The code described below refers to that source package, not the current GitHub tree.
-
 # Podcast AI Studio
 
 **Local-first podcast clipping studio for Windows** — a free, source-available Go desktop launcher with a polished local GUI, transcript-based highlight discovery, optional Ollama/OpenAI/Claude analysis, manual timeline adjustments, and FFmpeg vertical exports.
