@@ -1,0 +1,9 @@
+# Executables and local generated outputs
+*.exe
+*.zip
+*.mp4
+*.mov
+*.wav
+*.project.json
+.DS_Store
+.env
