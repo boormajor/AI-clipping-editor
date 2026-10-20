@@ -1,0 +1,36 @@
+name: Build Windows alpha
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  test-and-build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - name: Run tests
+        run: go test ./...
+      - name: Compile Windows application
+        shell: pwsh
+        run: go build -trimpath -ldflags='-s -w' -o PodcastAIStudio.exe ./cmd/studio
+      - name: Stage downloadable alpha bundle
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item PodcastAIStudio.exe dist/
+          Copy-Item Install-and-Run.bat dist/
+          Copy-Item README.md dist/
+          Copy-Item LICENSE dist/
+      - name: Upload Windows bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: PodcastAIStudio-Windows-x64-alpha
+          path: dist/*
