@@ -161,6 +161,16 @@ func AskModel(ctx context.Context, p ProviderConfig, prompt string) (string, err
 	var url string
 	var payload any
 	switch provider {
+	case "claude-code":
+		return askClaudeCode(ctx, prompt)
+	case "chatgpt":
+		if p.APIKey == "" {
+			return "", errors.New("connect your ChatGPT Plus account first")
+		}
+		if model == "" {
+			return "", errors.New("select an available ChatGPT model in AI Connections")
+		}
+		return askChatGPTPlan(ctx, p.APIKey, model, prompt)
 	case "ollama":
 		if model == "" {
 			model = "llama3.2"
