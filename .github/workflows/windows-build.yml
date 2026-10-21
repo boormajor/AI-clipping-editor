@@ -20,11 +20,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Check Go formatting and vet
+        shell: pwsh
+        run: |
+          $unformatted = gofmt -l (Get-ChildItem -Recurse -Filter *.go | ForEach-Object FullName)
+          if ($unformatted) { Write-Host "Unformatted files:`n$unformatted"; exit 1 }
+          go vet ./...
       - name: Verify Remotion dependencies and bundle
         shell: pwsh
         run: |
           cd remotion
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
+          npx tsc --noEmit
           npx remotion compositions src/index.ts
       - name: Run tests
         run: go test ./...

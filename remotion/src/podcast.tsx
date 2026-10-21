@@ -9,7 +9,7 @@ export type EditProps = {
   media:string; duration:number; width:number; height:number; fps:number;
   layout:'focus'|'two-up'|'dynamic'; pan:number; shots:Shot[];
   cues:Cue[]; words:Word[]; assets:Asset[];
-  captions:boolean; captionPreset:'kinetic'|'editorial'|'bold'|'minimal'|'karaoke'|'boxed'|'podcast';
+  captions:boolean; captionPreset:'kinetic'|'editorial'|'bold'|'minimal'|'karaoke'|'boxed'|'podcast'|'yellow'|'highlight';
   captionFont:string; captionSize:number; captionColor:string; accentColor:string;
   captionOffset:number; title:string; callout:string; graphics:boolean; zoom:boolean;
 };
@@ -38,7 +38,7 @@ function VideoStage({p}:{p:EditProps}){
  {isBoth ? <>
    <div style={{position:'absolute',left:pad,top:72,width:width-pad*2,height:Math.floor(height*.425),borderRadius:26,overflow:'hidden',border:`${border}px solid #293448`}}><Panel media={p.media} position="left" zoom={false}/></div>
    <div style={{position:'absolute',left:pad,top:Math.floor(height*.5),width:width-pad*2,height:Math.floor(height*.425),borderRadius:26,overflow:'hidden',border:`${border}px solid #293448`}}><Panel media={p.media} position="right" zoom={false}/></div>
- </> : <Panel media={p.media} position={shot.mode} zoom={p.zoom}/>}
+ </> : <Panel media={p.media} position={shot.mode==='both'?'full':shot.mode} zoom={p.zoom}/>}
  <div style={{position:'absolute',inset:0,background:'linear-gradient(0deg,rgba(0,0,0,.52) 0%,rgba(0,0,0,0) 42%)',pointerEvents:'none'}}/>
  </AbsoluteFill>;
 }
@@ -69,13 +69,18 @@ function CaptionLayer({p}:{p:EditProps}){
  const fade=interpolate(since,[0,.1,.23],[0,.93,1],{extrapolateRight:'clamp'});
  const scale=p.captionPreset==='kinetic'?interpolate(since,[0,.09,.22],[.84,1.06,1],{extrapolateRight:'clamp',easing:Easing.out(Easing.cubic)}):1;
  const preset=p.captionPreset;
- const box=preset==='boxed'||preset==='podcast';
+ const box=preset==='boxed'||preset==='podcast'||preset==='highlight';
+ // 'yellow' and 'highlight' tint the whole caption with the accent color; other
+ // presets use the chosen caption color, with the accent reserved for the active
+ // word in word-aligned (karaoke/kinetic) renders.
+ const accentText=preset==='yellow'||preset==='highlight';
+ const baseColor=accentText?(p.accentColor||'#FACC15'):(p.captionColor||'#fff');
  const fontSize=clamp(p.captionSize||76,30,150);
  const text=cue?.text||group?.map(w=>w.word).join(' ')||'';
  if(!text.trim())return null;
  return <AbsoluteFill style={{justifyContent:'flex-end',alignItems:'center',pointerEvents:'none',paddingBottom:Math.max(110,Math.round(height*.16))}}>
-  <div style={{maxWidth:'91%',padding:box?'16px 24px':'10px 8px',borderRadius:box?22:8,background:box?'rgba(8,13,28,.88)':'transparent',transform:`scale(${scale})`,opacity:fade,textAlign:'center',fontFamily:p.captionFont||'Arial',fontWeight:850,fontSize,lineHeight:1.11,letterSpacing:-1.1,color:p.captionColor||'#fff',textShadow:box?'0 2px 8px rgba(0,0,0,.5)':'0 4px 4px rgba(0,0,0,.95),0 0 12px rgba(0,0,0,.85)',WebkitTextStroke:preset==='bold'||preset==='kinetic'?'2px rgba(0,0,0,.82)':'0',overflowWrap:'break-word'}}>
- {group ? group.map((w,i)=><React.Fragment key={i}><span style={{color:t>=w.start&&t<w.end && (preset==='karaoke'||preset==='kinetic')?p.accentColor:p.captionColor||'#fff',display:'inline-block',transform:t>=w.start&&t<w.end && preset==='kinetic'?'scale(1.075)':'scale(1)'}}>{w.word}</span>{' '}</React.Fragment>) : text}
+  <div style={{maxWidth:'91%',padding:box?'16px 24px':'10px 8px',borderRadius:box?22:8,background:box?'rgba(8,13,28,.88)':'transparent',transform:`scale(${scale})`,opacity:fade,textAlign:'center',fontFamily:p.captionFont||'Arial',fontWeight:850,fontSize,lineHeight:1.11,letterSpacing:-1.1,color:baseColor,textShadow:box?'0 2px 8px rgba(0,0,0,.5)':'0 4px 4px rgba(0,0,0,.95),0 0 12px rgba(0,0,0,.85)',WebkitTextStroke:preset==='bold'||preset==='kinetic'?'2px rgba(0,0,0,.82)':'0',overflowWrap:'break-word'}}>
+ {group ? group.map((w,i)=><React.Fragment key={i}><span style={{color:t>=w.start&&t<w.end && (preset==='karaoke'||preset==='kinetic')?p.accentColor:baseColor,display:'inline-block',transform:t>=w.start&&t<w.end && preset==='kinetic'?'scale(1.075)':'scale(1)'}}>{w.word}</span>{' '}</React.Fragment>) : text}
  </div>
  </AbsoluteFill>;
 }

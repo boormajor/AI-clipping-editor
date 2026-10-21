@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"math"
-	"html"
-	"regexp"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -22,8 +22,8 @@ func cleanTitle(s string) string {
 	s = html.UnescapeString(html.UnescapeString(strings.TrimSpace(s)))
 	s = speakerMarker.ReplaceAllString(s, "")
 	s = strings.Trim(s, " \"\u201c\u201d.,!:-")
-	if len(s) > 85 {
-		s = strings.TrimSpace(s[:82]) + "…"
+	if r := []rune(s); len(r) > 85 {
+		s = strings.TrimSpace(string(r[:82])) + "…"
 	}
 	return s
 }
@@ -296,8 +296,11 @@ func AskModel(ctx context.Context, p ProviderConfig, prompt string) (string, err
 	return out.String(), nil
 }
 func truncate(s string, max int) string {
-	if len(s) > max {
-		return s[:max] + "…"
+	if max <= 0 {
+		return ""
+	}
+	if r := []rune(s); len(r) > max {
+		return string(r[:max]) + "…"
 	}
 	return s
 }

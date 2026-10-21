@@ -19,7 +19,7 @@ Windows-first, open-source podcast clipping studio. Import a finished single-cam
 
 | Tool | Purpose | Included / Cost |
 |---|---|---|
-| Remotion | **Required** final video renderer, motion typography, stacked/two-person shots, B-roll compositions | npm install required; separate license conditions apply |
+| Remotion | **Primary** final video renderer, motion typography, stacked/two-person shots, B-roll compositions (an FFmpeg fallback renders burned-caption clips if Remotion is not installed) | npm install required for motion captions; separate license conditions apply |
 | FFmpeg | Source trimming, soundtrack preparation, codec conversion | Free and open source; installed separately |
 | ChatGPT Plus sign-in / Claude Code | Online LLM for editorial clip selection, review, titles and shot proposals | Subject to plan eligibility and usage limits; API keys optional |
 | WhisperX | Optional speech recognition **and** word-level forced alignment; transcript agreement check | Free code/models; large model downloads and GPU/RAM usage |
@@ -52,7 +52,7 @@ Do not commit `.quality-venv/`, credentials, real recordings or generated clips 
 
 ## Current implementation and roadmap
 
-**Implemented in source:** Remotion-only rendering backend and motion-caption composition, caption font/color settings, optional real audio alignment, optional frame/scene observations, editorial review endpoint, two-person and shot-plan layouts, project persistence, safe source processing, local preview, API/plan-based LLM selection.
+**Implemented in source:** Remotion rendering backend and motion-caption composition with an automatic FFmpeg fallback (burns the original SRT cue boundaries when Node/Remotion is unavailable, never fabricated word timings), caption font/color settings, optional real audio alignment, optional frame/scene observations, editorial review endpoint, two-person and shot-plan layouts, project persistence, safe source processing, local preview, API/plan-based LLM selection.
 
 **Requires real Windows testing:** npm/Chrome/codec initialization, WhisperX CUDA installation, account sign-in sessions, large videos, rendering throughput. GitHub CI verifies Go tests and Remotion bundling; this is not the same as real editing quality validation.
 

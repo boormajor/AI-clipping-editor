@@ -77,20 +77,18 @@ func (a *application) reviewSelected(w http.ResponseWriter, r *http.Request) {
 	}
 	// Optional detector report is produced locally, with no dependency on cloud video uploads.
 	faceInfo := "Not available (face tracking tool not installed)."
-	if true {
-		if script, err := findFaceAudit(); err == nil {
-			temp, err := os.MkdirTemp("", "face-audit-")
-			if err == nil {
-				defer os.RemoveAll(temp)
-				clipFile := filepath.Join(temp, "clip.mp4")
-				reportFile := filepath.Join(temp, "faces.json")
-				ff := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", fmt.Sprintf("%.3f", c.Start), "-t", fmt.Sprintf("%.3f", c.End-c.Start), "-i", p.VideoPath, "-vf", "scale=640:-2", "-an", clipFile)
-				if ff.Run() == nil {
-					sc := exec.CommandContext(ctx, qualityPython(), script, "--video", clipFile, "--out", reportFile)
-					if sc.Run() == nil {
-						if b, e := os.ReadFile(reportFile); e == nil {
-							faceInfo = string(b)
-						}
+	if script, err := findFaceAudit(); err == nil {
+		temp, err := os.MkdirTemp("", "face-audit-")
+		if err == nil {
+			defer os.RemoveAll(temp)
+			clipFile := filepath.Join(temp, "clip.mp4")
+			reportFile := filepath.Join(temp, "faces.json")
+			ff := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", fmt.Sprintf("%.3f", c.Start), "-t", fmt.Sprintf("%.3f", c.End-c.Start), "-i", p.VideoPath, "-vf", "scale=640:-2", "-an", clipFile)
+			if ff.Run() == nil {
+				sc := exec.CommandContext(ctx, qualityPython(), script, "--video", clipFile, "--out", reportFile)
+				if sc.Run() == nil {
+					if b, e := os.ReadFile(reportFile); e == nil {
+						faceInfo = string(b)
 					}
 				}
 			}
@@ -143,8 +141,8 @@ func (a *application) reviewSelected(w http.ResponseWriter, r *http.Request) {
 		fail(w, 422, "AI returned an invalid review format: "+err.Error())
 		return
 	}
-	if len(v.Title) > 100 {
-		v.Title = v.Title[:100]
+	if r := []rune(v.Title); len(r) > 100 {
+		v.Title = string(r[:100])
 	}
 	if strings.TrimSpace(v.Title) == "" {
 		v.Title = c.Title

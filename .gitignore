@@ -7,3 +7,11 @@
 *.project.json
 .DS_Store
 .env
+
+# Dependencies and local environments
+node_modules/
+.quality-venv/
+
+# Remotion staged render jobs (keep the folder, not its contents)
+remotion/public/jobs/*
+!remotion/public/jobs/.gitkeep

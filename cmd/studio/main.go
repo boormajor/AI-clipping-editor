@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,13 +32,14 @@ type application struct {
 	jobs    map[string]*job
 }
 type job struct {
-	ID      string    `json:"id"`
-	Status  string    `json:"status"`
-	ClipID  string    `json:"clipId"`
-	Output  string    `json:"output,omitempty"`
-	Error   string    `json:"error,omitempty"`
-	Log     string    `json:"log,omitempty"`
-	Started time.Time `json:"started"`
+	ID       string    `json:"id"`
+	Status   string    `json:"status"`
+	ClipID   string    `json:"clipId"`
+	Output   string    `json:"output,omitempty"`
+	Error    string    `json:"error,omitempty"`
+	Log      string    `json:"log,omitempty"`
+	Renderer string    `json:"renderer,omitempty"`
+	Started  time.Time `json:"started"`
 }
 type apiError struct {
 	Error string `json:"error"`
@@ -199,8 +201,11 @@ func (a *application) load(w http.ResponseWriter, r *http.Request) {
 	a.status(w, r)
 }
 func limit(s string, n int) string {
-	if len(s) > n {
-		return s[:n]
+	if n <= 0 {
+		return ""
+	}
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
 	}
 	return s
 }
@@ -339,6 +344,7 @@ func (a *application) render(w http.ResponseWriter, r *http.Request) {
 	id := hex.EncodeToString(b[:])
 	j := &job{ID: id, ClipID: c.ID, Status: "queued", Started: time.Now()}
 	a.jobs[id] = j
+	a.pruneJobsLocked()
 	a.mu.Unlock()
 	go func() {
 		a.mu.Lock()
@@ -346,10 +352,25 @@ func (a *application) render(w http.ResponseWriter, r *http.Request) {
 		a.mu.Unlock()
 		ctx, cancel := context.WithTimeout(context.Background(), studio.RenderTimeout())
 		defer cancel()
+		// Remotion is the primary renderer. If it is unavailable (no Node/npm
+		// install yet) or fails, fall back to the FFmpeg renderer so a clip still
+		// exports. The fallback burns the original SRT cue boundaries — it never
+		// fabricates word timings.
 		out, debug, err := studio.RenderRemotion(ctx, p, c)
+		renderer := "remotion"
+		if err != nil && ctx.Err() == nil {
+			fbOut, fbDebug, fbErr := studio.Render(ctx, p, c)
+			if fbErr == nil {
+				out, renderer, err = fbOut, "ffmpeg-fallback", nil
+				debug = "Remotion unavailable; used FFmpeg fallback.\n[remotion] " + limit(debug, 400) + "\n[ffmpeg] " + fbDebug
+			} else {
+				debug = debug + "\nFFmpeg fallback also failed: " + fbErr.Error()
+			}
+		}
 		a.mu.Lock()
 		defer a.mu.Unlock()
 		j.Log = limit(debug, 1000)
+		j.Renderer = renderer
 		if err != nil {
 			j.Status = "failed"
 			j.Error = err.Error()
@@ -359,6 +380,29 @@ func (a *application) render(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	reply(w, map[string]any{"id": id, "status": "queued"})
+}
+
+// pruneJobsLocked keeps the in-memory job map bounded by dropping the oldest
+// finished (complete/failed) jobs. Must be called with a.mu held.
+func (a *application) pruneJobsLocked() {
+	const maxJobs = 60
+	if len(a.jobs) <= maxJobs {
+		return
+	}
+	type ref struct {
+		id      string
+		started time.Time
+	}
+	var finished []ref
+	for id, j := range a.jobs {
+		if j.Status == "complete" || j.Status == "failed" {
+			finished = append(finished, ref{id, j.Started})
+		}
+	}
+	sort.Slice(finished, func(i, j int) bool { return finished[i].started.Before(finished[j].started) })
+	for i := 0; i < len(finished) && len(a.jobs) > maxJobs; i++ {
+		delete(a.jobs, finished[i].id)
+	}
 }
 func (a *application) getJobs(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
@@ -463,10 +507,9 @@ func (a *application) pick(w http.ResponseWriter, r *http.Request) {
 	if q.Kind == "folder" {
 		script = "Add-Type -AssemblyName System.Windows.Forms; $dlg=New-Object System.Windows.Forms.FolderBrowserDialog; if($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){[Console]::Write($dlg.SelectedPath)}"
 	}
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-STA", "-Command", script)
 	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
 	defer cancel()
-	cmd = exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-STA", "-Command", script)
+	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-STA", "-Command", script)
 	out, e := cmd.CombinedOutput()
 	if e != nil {
 		fail(w, 500, "Picker failed: "+limit(string(out), 300))

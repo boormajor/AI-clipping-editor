@@ -81,8 +81,8 @@ func InspectFrames(ctx context.Context, video string, clip Clip, model string) (
 	default:
 		review.Layout = "manual"
 	}
-	if len(review.Reason) > 450 {
-		review.Reason = review.Reason[:450]
+	if r := []rune(review.Reason); len(r) > 450 {
+		review.Reason = string(r[:450])
 	}
 	return review, nil
 }
