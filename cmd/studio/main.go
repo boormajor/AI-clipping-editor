@@ -89,7 +89,6 @@ func main() {
 	mux.HandleFunc("POST /api/save", a.save)
 	mux.HandleFunc("POST /api/open", a.open)
 	mux.HandleFunc("POST /api/pick", a.pick)
-	mux.HandleFunc("POST /api/vision", a.reviewVision)
 	mux.HandleFunc("POST /api/stock/search", a.searchStock)
 	mux.HandleFunc("POST /api/stock/download", a.downloadStock)
 	mux.HandleFunc("GET /api/media", a.media)
@@ -164,7 +163,7 @@ func (a *application) status(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	p := a.project
 	a.mu.Unlock()
-	reply(w, map[string]any{"project": p, "tools": map[string]bool{"ffmpeg": has("ffmpeg"), "ffprobe": has("ffprobe"), "pdftotext": has("pdftotext"), "ollama": has("ollama"), "whisper": has("whisper-cli"), "remotion": studio.RemotionInstalled()}, "version": "0.4.0-alpha"})
+	reply(w, map[string]any{"project": p, "tools": map[string]bool{"ffmpeg": has("ffmpeg"), "ffprobe": has("ffprobe"), "pdftotext": has("pdftotext"), "whisper": has("whisper-cli"), "remotion": studio.RemotionInstalled()}, "version": "0.4.0-alpha"})
 }
 func has(v string) bool { _, e := exec.LookPath(v); return e == nil }
 func (a *application) load(w http.ResponseWriter, r *http.Request) {
