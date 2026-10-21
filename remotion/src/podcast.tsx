@@ -5,11 +5,38 @@ type Word = {start:number; end:number; word:string};
 type Cue = {start:number; end:number; text:string};
 type Shot = {start:number; end:number; mode:'both'|'left'|'right'; pan?:number};
 type Asset = {media:string; start:number; duration:number};
+
+// Caption presets. Word-level animations (reveal/pop/wipe/box) only take effect
+// when real WhisperX word timings are present; without them the whole SRT cue is
+// shown with the group entrance animation, never fabricated per-word timing.
+export type CaptionPreset =
+  'kinetic'|'editorial'|'bold'|'minimal'|'karaoke'|'boxed'|'podcast'|'yellow'|'highlight'|
+  'popline'|'wordbox'|'wipe'|'slide'|'bounce'|'typewriter';
+type Entrance = 'fade'|'pop'|'slide'|'bounce';
+type WordFx = 'none'|'color'|'punch'|'wipe'|'box';
+type CaptionSpec = {entrance:Entrance; word:WordFx; reveal:boolean; box:boolean; accentAll:boolean; stroke:boolean};
+const CAPTION_SPECS:Record<CaptionPreset,CaptionSpec>={
+  kinetic:   {entrance:'pop',    word:'punch', reveal:false, box:false, accentAll:false, stroke:true},
+  editorial: {entrance:'fade',   word:'none',  reveal:false, box:false, accentAll:false, stroke:false},
+  bold:      {entrance:'fade',   word:'none',  reveal:false, box:false, accentAll:false, stroke:true},
+  minimal:   {entrance:'fade',   word:'none',  reveal:false, box:false, accentAll:false, stroke:false},
+  karaoke:   {entrance:'fade',   word:'color', reveal:false, box:false, accentAll:false, stroke:true},
+  boxed:     {entrance:'pop',    word:'none',  reveal:false, box:true,  accentAll:false, stroke:false},
+  podcast:   {entrance:'fade',   word:'none',  reveal:false, box:true,  accentAll:false, stroke:false},
+  yellow:    {entrance:'fade',   word:'none',  reveal:false, box:false, accentAll:true,  stroke:true},
+  highlight: {entrance:'fade',   word:'none',  reveal:false, box:true,  accentAll:true,  stroke:false},
+  popline:   {entrance:'fade',   word:'punch', reveal:true,  box:false, accentAll:false, stroke:true},
+  wordbox:   {entrance:'fade',   word:'box',   reveal:false, box:false, accentAll:false, stroke:true},
+  wipe:      {entrance:'fade',   word:'wipe',  reveal:false, box:false, accentAll:false, stroke:true},
+  slide:     {entrance:'slide',  word:'color', reveal:false, box:false, accentAll:false, stroke:true},
+  bounce:    {entrance:'bounce', word:'punch', reveal:true,  box:false, accentAll:false, stroke:true},
+  typewriter:{entrance:'fade',   word:'none',  reveal:true,  box:false, accentAll:false, stroke:true},
+};
 export type EditProps = {
   media:string; duration:number; width:number; height:number; fps:number;
   layout:'focus'|'two-up'|'dynamic'; pan:number; shots:Shot[];
   cues:Cue[]; words:Word[]; assets:Asset[];
-  captions:boolean; captionPreset:'kinetic'|'editorial'|'bold'|'minimal'|'karaoke'|'boxed'|'podcast'|'yellow'|'highlight';
+  captions:boolean; captionPreset:CaptionPreset;
   captionFont:string; captionSize:number; captionColor:string; accentColor:string;
   captionOffset:number; title:string; callout:string; graphics:boolean; zoom:boolean;
 };
@@ -57,6 +84,32 @@ function captionGroups(words:Word[]):Word[][]{
  if(current.length)groups.push(current);
  return groups;
 }
+// One measured word, animated per the active caption spec. Nothing here invents
+// timing: reveal/punch/wipe are all driven by the word's own measured start/end.
+function WordSpan({w,spec,t,accent,base}:{w:Word;spec:CaptionSpec;t:number;accent:string;base:string}){
+ const active=t>=w.start&&t<w.end;
+ const revealed=!spec.reveal||t>=w.start-.001;
+ const popIn=spec.reveal&&(spec.word==='punch')?interpolate(t-w.start,[0,.08,.2],[.6,1.12,1],{extrapolateLeft:'clamp',extrapolateRight:'clamp',easing:Easing.out(Easing.cubic)}):1;
+ const activePunch=active&&spec.word==='punch'?1.08:1;
+ const style:React.CSSProperties={display:'inline-block',transform:`scale(${popIn*activePunch})`,transformOrigin:'center bottom',opacity:revealed?1:0,transition:'none'};
+ if(spec.word==='box'){
+  if(active){style.background=accent;style.color='#0b1020';style.borderRadius='.14em';style.padding='0 .16em';(style as any).boxDecorationBreak='clone';(style as any).WebkitBoxDecorationBreak='clone';}
+  else{style.color=base;}
+ }else if(spec.word==='wipe'){
+  if(active){
+   const prog=clamp((t-w.start)/Math.max(.08,w.end-w.start),0,1)*100;
+   style.backgroundImage=`linear-gradient(90deg, ${accent} ${prog}%, ${base} ${prog}%)`;
+   (style as any).WebkitBackgroundClip='text';style.backgroundClip='text';style.color='transparent';(style as any).WebkitTextFillColor='transparent';
+  }else{
+   style.color=t>=w.end?accent:base; // spoken words stay accent, unspoken stay base
+  }
+ }else if(spec.word==='color'||spec.word==='punch'){
+  style.color=active?accent:base;
+ }else{
+  style.color=base;
+ }
+ return <><span style={style}>{w.word}</span>{' '}</>;
+}
 function CaptionLayer({p}:{p:EditProps}){
  const frame=useCurrentFrame();const {fps,height}=useVideoConfig();const t=frame/fps-(p.captionOffset||0);
  if(!p.captions)return null;
@@ -64,23 +117,24 @@ function CaptionLayer({p}:{p:EditProps}){
  const group=aligned?captionGroups(p.words).find(g=>t>=g[0].start&&t<g[g.length-1].end):undefined;
  const cue=aligned?undefined:(p.cues||[]).find(c=>t>=c.start&&t<c.end);
  if(!group&&!cue)return null;
+ const spec=CAPTION_SPECS[p.captionPreset]||CAPTION_SPECS.kinetic;
+ const accent=p.accentColor||'#FACC15';
+ const baseColor=spec.accentAll?accent:(p.captionColor||'#fff');
  const cueStart=group?group[0].start:cue!.start;
  const since=Math.max(0,t-cueStart);
  const fade=interpolate(since,[0,.1,.23],[0,.93,1],{extrapolateRight:'clamp'});
- const scale=p.captionPreset==='kinetic'?interpolate(since,[0,.09,.22],[.84,1.06,1],{extrapolateRight:'clamp',easing:Easing.out(Easing.cubic)}):1;
- const preset=p.captionPreset;
- const box=preset==='boxed'||preset==='podcast'||preset==='highlight';
- // 'yellow' and 'highlight' tint the whole caption with the accent color; other
- // presets use the chosen caption color, with the accent reserved for the active
- // word in word-aligned (karaoke/kinetic) renders.
- const accentText=preset==='yellow'||preset==='highlight';
- const baseColor=accentText?(p.accentColor||'#FACC15'):(p.captionColor||'#fff');
+ // Group entrance animation.
+ let tx=0,scale=1;
+ if(spec.entrance==='pop')scale=interpolate(since,[0,.09,.22],[.84,1.06,1],{extrapolateRight:'clamp',easing:Easing.out(Easing.cubic)});
+ else if(spec.entrance==='slide')tx=interpolate(since,[0,.26],[54,0],{extrapolateRight:'clamp',easing:Easing.out(Easing.cubic)});
+ else if(spec.entrance==='bounce')scale=spring({fps,frame:Math.max(0,Math.round(since*fps)),config:{damping:11,mass:.7,stiffness:150}});
+ const box=spec.box;
  const fontSize=clamp(p.captionSize||76,30,150);
  const text=cue?.text||group?.map(w=>w.word).join(' ')||'';
  if(!text.trim())return null;
  return <AbsoluteFill style={{justifyContent:'flex-end',alignItems:'center',pointerEvents:'none',paddingBottom:Math.max(110,Math.round(height*.16))}}>
-  <div style={{maxWidth:'91%',padding:box?'16px 24px':'10px 8px',borderRadius:box?22:8,background:box?'rgba(8,13,28,.88)':'transparent',transform:`scale(${scale})`,opacity:fade,textAlign:'center',fontFamily:p.captionFont||'Arial',fontWeight:850,fontSize,lineHeight:1.11,letterSpacing:-1.1,color:baseColor,textShadow:box?'0 2px 8px rgba(0,0,0,.5)':'0 4px 4px rgba(0,0,0,.95),0 0 12px rgba(0,0,0,.85)',WebkitTextStroke:preset==='bold'||preset==='kinetic'?'2px rgba(0,0,0,.82)':'0',overflowWrap:'break-word'}}>
- {group ? group.map((w,i)=><React.Fragment key={i}><span style={{color:t>=w.start&&t<w.end && (preset==='karaoke'||preset==='kinetic')?p.accentColor:baseColor,display:'inline-block',transform:t>=w.start&&t<w.end && preset==='kinetic'?'scale(1.075)':'scale(1)'}}>{w.word}</span>{' '}</React.Fragment>) : text}
+  <div style={{maxWidth:'91%',padding:box?'16px 24px':'10px 8px',borderRadius:box?22:8,background:box?'rgba(8,13,28,.88)':'transparent',transform:`translateY(${tx}px) scale(${scale})`,opacity:fade,textAlign:'center',fontFamily:p.captionFont||'Arial',fontWeight:850,fontSize,lineHeight:1.14,letterSpacing:-1.1,color:baseColor,textShadow:box?'0 2px 8px rgba(0,0,0,.5)':'0 4px 4px rgba(0,0,0,.95),0 0 12px rgba(0,0,0,.85)',WebkitTextStroke:spec.stroke?'2px rgba(0,0,0,.82)':'0',overflowWrap:'break-word'}}>
+ {group ? group.map((w,i)=><WordSpan key={i} w={w} spec={spec} t={t} accent={accent} base={baseColor}/>) : text}
  </div>
  </AbsoluteFill>;
 }
