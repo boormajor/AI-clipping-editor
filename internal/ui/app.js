@@ -95,14 +95,6 @@ api('status').then(assign).catch(e=>toast(e.message,true));
 let stockResults=[];
 $('searchStock').onclick=()=>busy($('searchStock'),async()=>{if(!chosen())throw Error('Select a clip first');let r=await api('stock/search',{query:$('stockQuery').value.trim(),apiKey:$('pexelsKey').value.trim()});stockResults=r.videos||[];$('stockResults').innerHTML=stockResults.length?stockResults.map((v,i)=>'<button class="stock-item" data-idx="'+i+'" title="Download video from Pexels and add to this clip"><img src="'+esc(v.preview)+'" loading="lazy" alt="Stock preview"><span>'+esc(v.credit||'Pexels contributor')+'</span></button>').join(''):'<div class="stock-wait">No stock results. Try another search.</div>';document.querySelectorAll('.stock-item').forEach(b=>b.onclick=()=>busy(b,async()=>{let v=stockResults[Number(b.dataset.idx)];let result=await api('stock/download',{url:v.url,id:v.id});let c=chosen();if(!c)return;c.broll=c.broll||[];c.broll.push({path:result.path,start:Number($('brollStart').value),duration:Number($('brollDuration').value)});renderBroll();toast('Downloaded Pexels footage. Click Apply clip changes to keep it.') }))});
 
-$('syncWords').onclick=()=>busy($('syncWords'),async()=>{
- const clip=chosen();if(!clip)throw Error('Choose a clip first');
- $('syncStatus').textContent='Analyzing actual audio with WhisperX. This can take several minutes…';
- const result=await api('align',{id:clip.id,model:'small',language:$('syncLang').value});
- const state=await api('status');assign(state);
- $('syncStatus').textContent=result.words+' recognized words · '+Math.round(result.agreement*100)+'% transcript agreement. '+result.warning;
- toast('Audio aligned. Review the recognition before exporting.');
-});
 $('aiReview').onclick=()=>busy($('aiReview'),async()=>{
  const clip=chosen();if(!clip)throw Error('Choose a clip first');
  $('aiReviewSummary').textContent='Online AI is reviewing context and composing a shot plan…';
