@@ -38,7 +38,7 @@ export type EditProps = {
   cues:Cue[]; words:Word[]; assets:Asset[];
   captions:boolean; captionPreset:CaptionPreset;
   captionFont:string; captionSize:number; captionColor:string; accentColor:string;
-  captionOffset:number; title:string; callout:string; graphics:boolean; zoom:boolean; emphasis?:boolean;
+  captionOffset:number; captionWords?:number; title:string; callout:string; graphics:boolean; zoom:boolean; emphasis?:boolean;
 };
 // Power words / numbers get accent emphasis when the "emphasis" option is on.
 const POWER=new Set(['now','new','free','stop','never','always','secret','how','why','best','worst','biggest','mistake','proven','instantly','fast','easy','money','growth','win','warning','huge','important','truth','results','million','billion','everyone','nobody','everything','nothing']);
@@ -50,7 +50,7 @@ function isEmph(raw:string):boolean{
  if(letters.length>=2 && raw===raw.toUpperCase() && /[A-Z]/.test(raw))return true;
  return POWER.has(w);
 }
-const defaults:EditProps={media:'example.mp4',duration:5,width:1080,height:1920,fps:30,layout:'two-up',pan:.5,shots:[],cues:[],words:[],assets:[],captions:true,captionPreset:'kinetic',captionFont:'Arial',captionSize:76,captionColor:'#FFFFFF',accentColor:'#FACC15',captionOffset:0,title:'',callout:'',graphics:false,zoom:false,emphasis:false};
+const defaults:EditProps={media:'example.mp4',duration:5,width:1080,height:1920,fps:30,layout:'two-up',pan:.5,shots:[],cues:[],words:[],assets:[],captions:true,captionPreset:'kinetic',captionFont:'Arial',captionSize:76,captionColor:'#FFFFFF',accentColor:'#FACC15',captionOffset:0,captionWords:3,title:'',callout:'',graphics:false,zoom:false,emphasis:false};
 const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
 function shotAt(t:number,p:EditProps):Shot {
  const found=p.shots?.find(s=>t>=s.start&&t<s.end);
@@ -83,11 +83,11 @@ function VideoStage({p}:{p:EditProps}){
 // the *whole SRT cue*, never fabricated evenly spaced word timings.
 // Group *measured* words by pauses and short, phone-readable phrases.
 // No timestamp interpolation: a word is highlighted only inside its measured range.
-function captionGroups(words:Word[]):Word[][]{
+function captionGroups(words:Word[],maxWords:number):Word[][]{
  const groups:Word[][]=[];let current:Word[]=[];
  for(const word of words){
   if(current.length>0){const last=current[current.length-1];
-   if(word.start-last.end>.32 || word.end-current[0].start>2.35 || current.length>=6){groups.push(current);current=[];}
+   if(word.start-last.end>.32 || word.end-current[0].start>2.35 || current.length>=maxWords){groups.push(current);current=[];}
   }
   current.push(word);
  }
@@ -126,7 +126,7 @@ function CaptionLayer({p}:{p:EditProps}){
  const frame=useCurrentFrame();const {fps,height}=useVideoConfig();const t=frame/fps-(p.captionOffset||0);
  if(!p.captions)return null;
  const aligned=(p.words||[]).length>0;
- const group=aligned?captionGroups(p.words).find(g=>t>=g[0].start&&t<g[g.length-1].end):undefined;
+ const group=aligned?captionGroups(p.words,clamp(p.captionWords||3,1,12)).find(g=>t>=g[0].start&&t<g[g.length-1].end):undefined;
  const cue=aligned?undefined:(p.cues||[]).find(c=>t>=c.start&&t<c.end);
  if(!group&&!cue)return null;
  const spec=CAPTION_SPECS[p.captionPreset]||CAPTION_SPECS.kinetic;
