@@ -66,6 +66,8 @@ func transcribePart(ctx context.Context, audioPath string, cfg CloudSpeech) ([]W
 // Whisper API for measured word start/end times. It never guesses word times.
 func TranscribeVideoAudio(ctx context.Context,video string,duration float64,cfg CloudSpeech)([]Word,error){
  if duration<=0{return nil,errors.New("video duration is missing")}
+ if cfg.Provider!="groq"&&cfg.Provider!="openai"{return nil,errors.New("Select Groq or OpenAI under Cloud transcription")}
+ if strings.TrimSpace(cfg.APIKey)==""{return nil,errors.New("Enter a Groq or OpenAI speech API key to transcribe this video. ChatGPT Plus sign-in covers text analysis, not speech API requests.")}
  if _,err:=exec.LookPath("ffmpeg");err!=nil{return nil,errors.New("FFmpeg is required to extract podcast audio")}
  tmp,err:=os.MkdirTemp("","podcast-cloud-speech-");if err!=nil{return nil,err}
  defer os.RemoveAll(tmp)
