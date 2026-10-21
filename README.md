@@ -1,145 +1,74 @@
-# Podcast AI Studio
+# Podcast AI Studio — v0.4 Quality Pipeline (Alpha)
 
-**Local-first podcast clipping studio for Windows** — a free, source-available Go desktop launcher with a polished local GUI, transcript-based highlight discovery, optional Ollama/OpenAI/Claude analysis, manual timeline adjustments, and FFmpeg vertical exports.
+Windows-first, open-source podcast clipping studio. Import a finished single-camera/split-screen recording and timestamped SRT/VTT, connect ChatGPT Plus or Claude Pro through the existing supported sign-in integration, pick short highlights, improve context, align speech, edit shots, and export **through Remotion**. Nothing publishes automatically.
 
-> **Status: v0.3.0 alpha.** This is a genuinely executable first build, not a full replacement for professional editors or OpusClip. Features marked *planned* in the GUI are not implemented yet. The project is built around original-media safety: imported footage is never modified. All renders go to a separate output folder.
+> **Alpha, not a complete commercial OpusClip replacement.** The Windows workflow and real subscription access require on-device verification. Automated quality checks make suggestions and can still be wrong; review the final render. The GUI's video preview is a rough source preview, not a live Remotion composition.
 
-## Get started on Windows
+## Installation (Windows)
 
-1. Download the archive and extract it somewhere you can write files.
-2. **Double-click `Install-and-Run.bat`**. It checks whether `ffmpeg`/`ffprobe` are installed and offers to install the free FFmpeg package with Windows Package Manager (`winget`). Restart the batch file or Windows terminal after installing if PATH has not refreshed.
-3. The batch file starts `PodcastAIStudio.exe`. The app opens in an **Edge app window** (or your default browser if Edge isn't found). Keep the console window open while you work; closing it stops the local app.
-4. In Studio, click **Browse** next to a finished podcast recording and a **timestamped SRT or VTT transcript** (recommended export from Descript). TXT, DOCX, PDF, Markdown, and JSON parsing is available, but the current version cannot safely invent timings for untimed text. See [Transcript formats](#transcript-formats).
-5. Select **AI connections**: built-in heuristic, Ollama, **ChatGPT Plus/Pro sign-in**, **Claude Pro/Max via official Claude Code**, OpenAI API, or Anthropic API. API keys remain optional for separately billed API modes, and are **never saved to the project JSON**.
-6. Pick clip count/duration, click **Find best moments**, adjust chosen clips, and click **Render clip**. MP4 files appear in your selected export folder.
-7. Save the project to `podcast-ai-studio.project.json` in the export folder for later editing.
+1. In [GitHub Actions](https://github.com/boormajor/AI-clipping-editor/actions), download the most recent **successful** `PodcastAIStudio-Windows-x64-alpha` build artifact.
+2. Extract the ENTIRE ZIP, including `remotion/`, `scripts/`, the EXE and `Install-and-Run.bat`.
+3. Double-click `Install-and-Run.bat`. It checks **FFmpeg** and requires **Node.js 20+**. The launcher runs `npm install` inside `remotion/` on first launch (internet needed). Node/Remotion installation can take several minutes. Keep the console window open.
+4. In **AI connections**, use either **Continue with ChatGPT** or **Claude Code login**, subject to plan eligibility and provider limits. API-key modes are available for separately billed API usage. Do not paste account cookies, passwords or subscription tokens into API key fields.
+5. Import the finished video and a timestamped SRT or VTT exported from Descript. Choose a folder for exports, and click **Import episode**.
+6. Choose **Find best moments** with an online model. Select a clip, and use **AI improve clip** for better standalone context, title and a proposed shot plan. Review what it changed.
+7. For best captions, run **Install-Quality-Tools.bat** once, then click **Sync captions to audio** in the clip editor. This runs WhisperX on the *actual audio*, not guessed word timing. Review the transcript agreement and any technical terms.
+8. Choose caption template, font, colors, shot layout, local/Pexels B-roll and effects. Press **Apply clip changes**, then **Render with Remotion**. Open **Render queue** to find the MP4. Save your project for another editing session.
 
-The Windows EXE is **only the application**; external FFmpeg remains a separate free dependency. The included installer helps set it up. No model downloads, stock footage, or paid accounts are included in the EXE.
+### Included and optional tools
 
-## Use your $20 subscriptions without adding an API key
+| Tool | Purpose | Included / Cost |
+|---|---|---|
+| Remotion | **Required** final video renderer, motion typography, stacked/two-person shots, B-roll compositions | npm install required; separate license conditions apply |
+| FFmpeg | Source trimming, soundtrack preparation, codec conversion | Free and open source; installed separately |
+| ChatGPT Plus sign-in / Claude Code | Online LLM for editorial clip selection, review, titles and shot proposals | Subject to plan eligibility and usage limits; API keys optional |
+| WhisperX | Optional speech recognition **and** word-level forced alignment; transcript agreement check | Free code/models; large model downloads and GPU/RAM usage |
+| MediaPipe + OpenCV | Optional sample-frame face occupancy and edge-risk measurements | Free code; installed separately |
+| PySceneDetect | Optional scene-cut metadata to inform online AI review | Free code; installed separately |
+| Pexels | Optional manual free-stock search and downloading | Free API key; usage terms and licensing apply |
 
-### ChatGPT Plus / Pro — official Sign in with ChatGPT
+**Free tools do not guarantee free cloud inference, content licenses, or Remotion commercial rights.** Remotion's free license covers individuals and qualifying small teams; larger teams or commercial automation products may need a paid license. Read [Remotion licensing](https://www.remotion.dev/docs/license/pricing) before commercial use.
 
-1. In **AI connections**, select **ChatGPT Plus / Pro — Sign in with ChatGPT**.
-2. Click **Continue with ChatGPT**. A secure OpenAI browser login window opens. Approve **ChatGPT plan usage** (not identity-only access).
-3. Return to Studio; the GUI will show your connection and discover models available to your account. Select one from the model input suggestions, then click **Use this AI provider**.
-4. Import a timestamped transcript and click **Find best moments**. The OpenAI subscription request sends *selected transcript candidates* to the official Responses API with `store: false` and `stream: true`.
+### AI quality boundaries
 
-This uses the public [Sign in with ChatGPT open-source authorization flow](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), including dynamic client registration, PKCE, authorization-code exchange, ID-token signature/nonce validation, scope verification, model discovery, and token refresh. On Windows the profile is encrypted with the current user's DPAPI account key and saved under the Windows user config directory. Authentication takes place on OpenAI's website; never enter your password in Podcast AI Studio. Manage the app's permitted usage through ChatGPT settings. Eligible usage counts against plan limits and may be unavailable for some accounts or regions.
+- **Online-first editorial review:** An authorized ChatGPT/Claude model gets the current clip transcript, about 18 seconds before and 14 after, observed face bounding-box metadata (if MediaPipe is installed), real alignment coverage (if WhisperX ran), and scene-cut metadata (if PySceneDetect is installed). It writes a title, flags context problems and may create an editable shot schedule. No unsupported claims that the cloud model watched the recording; the current subscription adapter does **not** send video frames or audio to the online model.
+- **Caption honesty:** With WhisperX, the Remotion animated captions follow actual recognized **word times** and use the recognizer's words. Without WhisperX, subtitles follow the original SRT cue boundaries; words are NOT falsely highlighted as if individually aligned. `Sync captions` may require correcting proper nouns and marketing jargon.
+- **Safer two-speaker framing:** `Both speakers` stacks left/right halves for an existing side-by-side source. `Dynamic` uses a draft shot schedule with both-speaker safety bias; the AI reviewer can propose edits. There is **no reliable automatic speaker-to-camera attribution** yet from a mixed video.
+- **Professional polish:** Remotion adds kinetic caption entrances, measured karaoke highlights, boxed/editorial templates, configurable color/font/size, title graphics, fixed or AI-proposed shots, editable layer decisions, and user-supplied B-roll. Seamless word-perfect alignment, universal face tracking and automatic creative stock selection cannot be promised without correct tools and human review.
+- **Quality vs speed:** Transcription and rendering may take much longer than a clip's runtime. No original video/transcript files are overwritten; temporary staged media is deleted after rendering.
 
-**Security note:** The app accepts only OpenAI's documented public inference endpoint; it does not scrape ChatGPT or re-use browser cookies. You can disconnect its local credentials in the app and revoke access remotely in ChatGPT settings. The initial Windows build has not yet been verified using a live user account.
+## Optional quality tools (Windows)
 
-### Claude Pro / Max — official Claude Code
+Run `Install-Quality-Tools.bat` after installing **Python 3.11** and a suitable PyTorch CUDA build for your GPU. It installs WhisperX, MediaPipe and PySceneDetect into a virtual environment in `.quality-venv`. The runtime tries the quality environment automatically when present. Large model weights download on first alignment. WhisperX CPU fallback is slower. Check tool licenses and Python/CUDA compatibility.
 
-1. Install [Claude Code](https://code.claude.com/docs/en/setup), then open the AI connections panel and choose **Claude Pro / Max — Claude Code login**.
-2. Click **Open Claude Code login**, or use PowerShell: `claude auth login`. Sign in to your **Claude subscription** account, not Anthropic Console/API billing.
-3. Click **Recheck sign-in**, choose the Claude Code provider and click **Use this AI provider**.
-4. The app calls the official `claude -p` CLI *without tools or persistent sessions*, sends transcript candidate text by standard input, and parses its JSON result. It never copies subscription OAuth tokens. Ensure your Claude Code authentication is using the subscription, not API billing; Anthropic's subscription usage and potential usage-credit rules still apply.
+To install manually from project root:
 
-If either provider isn't available, choose **Ollama** (free local model) or the built-in heuristic. Claude Code must be installed separately; the EXE does not bundle it.
+```powershell
+py -3.11 -m venv .quality-venv
+.quality-venv\Scripts\python.exe -m pip install whisperx mediapipe==0.10.21 opencv-python-headless 'scenedetect[opencv]'
+```
 
-### API key modes
+Do not commit `.quality-venv/`, credentials, real recordings or generated clips to GitHub.
 
-OpenAI API and Anthropic API remain available as *optional* separately billed providers. ChatGPT Plus / Claude Pro do not themselves provide an ordinary API key or unlimited inference. Never paste subscription browser tokens or cookies into an API key field.
+## Current implementation and roadmap
 
-## v0.3 improvements (manual review required)
+**Implemented in source:** Remotion-only rendering backend and motion-caption composition, caption font/color settings, optional real audio alignment, optional frame/scene observations, editorial review endpoint, two-person and shot-plan layouts, project persistence, safe source processing, local preview, API/plan-based LLM selection.
 
-- More context-aware model instructions: clip selection requests a stand-alone hook, an accurate short title, and an explanation. This is a text review, not yet automated visual/audio review.
-- Caption timing preserves exact SRT/VTT cue time boundaries; the editor exposes a **manual global caption offset** for exports created with a shifted transcript. This does **not** fix incorrect source transcriptions or provide word-level alignment.
-- User-selectable font and size for subtitles. Only fonts installed on the rendering PC are available.
-- **Two-up layout** uses the left and right half of the same finished side-by-side podcast recording and stacks them vertically. It is not automatic active-speaker detection; the editor must choose the layout.
-- Optional **local frame inspector** samples three JPEG frames and sends them to an Ollama vision model installed on the PC (default `gemma3:4b`). It recommends a layout and flags obvious cropping risks, but cannot guarantee face visibility, infer speaking order, or verify captions against sound. Cloud-connected ChatGPT/Claude do not receive frames.
-- Simplified interface labels. Visual accuracy still requires editor review of rendered MP4s.
+**Requires real Windows testing:** npm/Chrome/codec initialization, WhisperX CUDA installation, account sign-in sessions, large videos, rendering throughput. GitHub CI verifies Go tests and Remotion bundling; this is not the same as real editing quality validation.
 
-## Editing controls
+**Not implemented yet:** true online multimodal video+audio understanding through subscription plans; automatic cloud video upload workflow; built-in visual keyframe editor; continuous face tracking; perfect audio-to-face speaker detection; fully automatic licensed B-roll selection and placement; multi-pass render critique and repair; complete sound design; drag/drop multi-track editor. Further work is required for commercial tool parity.
 
-| Feature | Status in v0.1.0 | Notes |
-| --- | --- | --- |
-| Windows .exe, local GUI | **Working; compiled** | Small native launcher, local server; Edge in app mode; default browser fallback |
-| SRT/VTT, timecoded text, Whisper-style JSON | **Working; tested** | Import parsed into timecoded cues |
-| DOCX and PDF extraction | **Partial** | Reads content; timed transcript still required. PDF requires `pdftotext` from Poppler |
-| Automatic plain-text alignment | **Planned** | Will need a locally installed Whisper-based aligner; untimed clips are deliberately blocked |
-| AI highlight suggestions | **Working** | Free heuristic; optional Ollama, OpenAI, Anthropic; human should review selections |
-| AI accounts | **ChatGPT subscription / Claude Code / API keys / local** | OpenAI OSS sign-in and Anthropic official CLI; subject to usage and eligibility. API key modes are separate billing |
-| Adjustable clip count and duration | **Working** | User specifies maximum count and length bounds |
-| Editable clip trim points | **Working** | Numeric in/out and visual transcript timeline handles |
-| Vertical video reframing | **Working, manual focus** | Adjustable horizontal focal point, center by default; does not track faces yet |
-| Local live preview | **Working** | Embedded player, subtitle preview, cue timing |
-| Subtitle style templates | **Working, basic styles** | Bold, minimal, yellow, highlight/accent, karaoke/accent, podcast. Word-by-word highlighting is planned |
-| Subtitle burning | **Working; tested** | Styled ASS subtitles burned into video with FFmpeg |
-| B-roll | **Working, local layer placement** | Optional local overlays at chosen offsets; original spoken audio remains |
-| Stock footage | **Working, manually selected** | Optional free Pexels API key; searches/videos are never downloaded automatically |
-| Callout graphics | **Working, basic** | Optional text callout overlays using FFmpeg's drawtext filter; limited templates |
-| Automatic zoom | **Basic effect** | One fixed punch-in around seconds 1.5–3.5 if enabled; dynamic ML timing planned |
-| Transitions and sound effects | **Planned** | Switches stored in project, do not create effects yet |
-| Auto face/speaker tracking | **Planned** | Ideal for mixed-camera/split-screen podcast exports |
-| Automatically chosen B-roll | **Planned** | Pexels stock is currently searched/added manually |
-| Professional multi-track editing UI | **Early prototype** | Timed clip trim and B-roll layers; full drag/drop timeline is planned |
-| Render queue | **Working** | Renders in background with success/failure shown; NVIDIA NVENC with software fallback |
-| GPU acceleration | **Working when NVENC enabled** | Most processing still uses CPU FFmpeg filtering |
-| Project save/reopen | **Working** | JSON stored separate from source media |
-| 9:16 1080×1920 / 30 FPS | **Default** | Resolution and 24/25/30/60 FPS customizable |
-| 60 FPS and 16:9 layouts | **Configurable** | Output dimensions are user-selectable |
-
-## Three editing presets
-
-- **Simple** — clip selection, captions, and vertical reframing. Every clip is editable.
-- **Advanced** — also enables zooms, callouts, local B-roll, and other advanced preferences. Some switches remain planned; the interface labels them accordingly.
-- **Custom** — enable or disable captions, reframing, B-roll, stock, motion graphics, zooms, transitions, and SFX separately. Changes are saved to the project.
-
-### Transcript formats
-
-- **Recommended:** `.srt` or `.vtt`, with cue start and end times. Also accepts timecoded `.txt` or `.md` lines and Whisper-like `.json` with `segments`.
-- **Accepted for text extraction, but not directly clip-ready:** `.txt`, `.docx`, and `.pdf` without timestamps. PDF requires Poppler's `pdftotext`. The current application **refuses to make up timestamps**; export SRT/VTT first. Forced alignment is a next milestone.
-- Word timestamps are not required for basic subtitle timing, but fine-grained karaoke animations will require finer alignment.
-
-### Stock footage and attribution
-
-Free stock search is powered by [Pexels API](https://www.pexels.com/api/), subject to its API usage terms and license. The app requires your Pexels API key, displays attribution, and downloads only after you click a particular result. Always check asset licensing against your use case.
-
-### Privacy
-
-- The app binds **only to `127.0.0.1`**, uses local same-origin checks, and serves local media only from the loaded project and export job outputs.
-- OpenAI and Anthropic receive **candidate transcript passages and the prompt**, not video files. They may process text remotely.
-- Ollama uses `http://127.0.0.1:11434`. Built-in heuristic needs no network.
-- Stock search and downloads contact Pexels **only when manually initiated**.
-- Source media are opened read-only by FFmpeg. Output files are placed in the export folder; exporting a clip again with the same ID will replace **that rendered output** but never the original video.
-- User-provided API keys are held only in browser runtime state (not saved in project JSON), so avoid sharing your computer session while a key is entered.
-
-## Development
-
-Requires Go 1.23+, FFmpeg + ffprobe (on your PATH). No runtime npm, Python, database, or paid SDK dependencies for the built-in mode.
+## Developers
 
 ```bash
 go test ./...
-go run ./cmd/studio
+cd remotion
+npm install
+npx remotion compositions src/index.ts
+# Build native launcher from repository root:
+go build -o PodcastAIStudio.exe ./cmd/studio
 ```
 
-Windows build from any Go-supported OS:
+The Go backend starts on 127.0.0.1; React/Remotion code is in `remotion/src`. Imported videos and cloud auth credentials are never committed. Remotion is a separate runtime project: **the Windows EXE alone is insufficient**.
 
-```bash
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o PodcastAIStudio.exe ./cmd/studio
-```
-
-The UI is vanilla HTML/CSS/JavaScript embedded in the Go executable via `embed.FS`. The local HTTP API is in `cmd/studio`, and transcript/AI/edit/render tools are under `internal/studio`.
-
-## GitHub publishing
-
-When GitHub repository creation isn't available from a connector, run the included `scripts/Publish-GitHub.ps1` **yourself** from an extracted project folder. It authenticates via GitHub CLI, asks before creating a **private** `podcast-ai-studio` repository, and pushes source files. No user password or token is stored by the project.
-
-A GitHub Actions workflow in `.github/workflows/windows-build.yml` compiles and tests the Windows EXE whenever code is pushed. It uploads a Windows artifact. Release packaging can be extended to include an installer later.
-
-## Planned development stages
-
-1. **MVP hardening:** broader timestamp alignment via local Whisper, Windows end-to-end test on an RTX 3070, resilient clip previews, persistent editing presets and progress indicators.
-2. **Smart editor:** face/speaker tracking, scene-change detection, cue-aware zoom timing, draggable clip/B-roll tracks, undo/redo, reusable editing template packs.
-3. **Advanced effects:** automatic semantic stock/B-roll selection, audio ducking and SFX, animated word-level subtitle presets, transitions, keyframes and motion graphic themes.
-4. **Product polish:** project organizer, automatic source relinking, installer with dependency manager, batch export, background queue cancellation, robust crash recovery.
-
-## Notes
-
-No Descript account access is requested or required. The default app does not modify Descript, Premiere, or other software projects. This is not an official product of OpenAI, Anthropic, Descript, or Pexels.
-
-## License
-
-The original project code is licensed under the MIT License. FFmpeg, Ollama, Pexels content, and any model dependencies have separate licenses and terms.
+License: MIT for our application source only. Third-party packages, model weights, Pexels assets and Remotion carry their own licenses.
