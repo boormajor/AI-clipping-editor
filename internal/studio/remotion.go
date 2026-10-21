@@ -71,6 +71,7 @@ type remotionProps struct {
 	CaptionColor  string          `json:"captionColor"`
 	AccentColor   string          `json:"accentColor"`
 	CaptionOffset float64         `json:"captionOffset"`
+ CaptionWords int `json:"captionWords"`
 	Title         string          `json:"title"`
 	Callout       string          `json:"callout"`
 	Graphics      bool            `json:"graphics"`
@@ -130,7 +131,7 @@ func makeRemotionProps(p Project, c Clip) (remotionProps, error) {
 	x := remotionProps{Duration: dur, Width: cfg.Width, Height: cfg.Height, FPS: cfg.FPS, Layout: c.Layout, Pan: c.Pan, Shots: c.Shots, Cues: []Cue{}, Words: c.Words,
 		Assets: []remotionAsset{}, Captions: cfg.Captions && c.Captions, CaptionPreset: c.CaptionStyle, CaptionFont: validCaptionFont(cfg.CaptionFont),
 		CaptionSize: cfg.CaptionSize, CaptionColor: color(cfg.CaptionColor, "#FFFFFF"), AccentColor: color(cfg.AccentColor, "#FACC15"),
-		CaptionOffset: cfg.CaptionOffset, Title: c.Title, Callout: c.Callout, Graphics: cfg.Graphics, Zoom: cfg.Zoom, Emphasis: cfg.CaptionEmphasis}
+		CaptionOffset: cfg.CaptionOffset, CaptionWords: cfg.CaptionWords, Title: c.Title, Callout: c.Callout, Graphics: cfg.Graphics, Zoom: cfg.Zoom, Emphasis: cfg.CaptionEmphasis}
 	if x.CaptionPreset == "" {
 		x.CaptionPreset = cfg.CaptionStyle
 	}
