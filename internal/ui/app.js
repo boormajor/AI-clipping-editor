@@ -77,7 +77,19 @@ $('editPan').oninput=()=>{$('panLabel').textContent=$('editPan').value+'%';$('pr
 $('addBroll').onclick=()=>{const c=chosen();if(!c)return;const path=$('brollPath').value.trim();if(!path)return toast('Choose a local B-roll video file',true);if(!c.broll)c.broll=[];c.broll.push({path,start:Number($('brollStart').value),duration:Number($('brollDuration').value)});renderBroll();drawTimeline();toast('B-roll added to clip timeline. Click Apply to save it.')};
 $('updateClip').onclick=()=>busy($('updateClip'),async()=>{const c=chosen();if(!c)return;const copy={...c,title:$('editTitle').value,start:Number($('editStart').value),end:Number($('editEnd').value),pan:Number($('editPan').value)/100,layout:$('editLayout').value,captions:$('editCaptions').checked,captionStyle:$('editCaptionStyle').value,callout:$('editCallout').value};await api('clip',copy);Object.assign(c,copy);renderClips();renderEditor();toast('Clip changes applied')});
 $('renderSelected').onclick=()=>busy($('renderSelected'),async()=>{await saveConfig();let result=await api('render',{id:selectedID});toast('Render queued. Check the Render queue tab for progress.');setPage('exports');refreshJobs()});
-const player=$('previewVideo');player.addEventListener('timeupdate',()=>{const c=chosen();if(!c)return;if(player.currentTime>c.end+.05&&player.currentTime>c.start){player.pause();player.currentTime=c.start};const cue=(project.cues||[]).find(x=>x.start+(project.config.captionOffset||0)<=player.currentTime&&x.end+(project.config.captionOffset||0)>=player.currentTime);$('captionPreview').textContent=cue?cue.text:' ';});
+const player=$('previewVideo');player.addEventListener('timeupdate',()=>{const c=chosen();if(!c)return;if(player.currentTime>c.end+.05&&player.currentTime>c.start){player.pause();player.currentTime=c.start};const rel=player.currentTime-c.start-(project.config.captionOffset||0);
+ const words=c.words||[];
+ if(words.length){
+  const max=Math.max(1,Math.min(12,Number(project.config.captionWords)||3));
+  const groups=[];let group=[];
+  for(const w of words){if(group.length){const last=group[group.length-1];if(w.start-last.end>.32||w.end-group[0].start>2.35||group.length>=max){groups.push(group);group=[]}}group.push(w)}
+  if(group.length)groups.push(group);
+  const active=groups.find(g=>rel>=g[0].start&&rel<g[g.length-1].end);
+  $('captionPreview').textContent=active?active.map(w=>w.word).join(' '):' ';
+ }else{
+  const cue=(project.cues||[]).find(x=>x.start+(project.config.captionOffset||0)<=player.currentTime&&x.end+(project.config.captionOffset||0)>=player.currentTime);
+  $('captionPreview').textContent=cue?cue.text:' ';
+ }});
 async function refreshJobs(){try{jobs=await api('jobs');const out=$('jobList');out.classList.toggle('empty-state',!jobs.length);out.innerHTML=jobs.length?jobs.map(j=>{
  const active=(j.status==='rendering'||j.status==='queued');
  const prog=active?'<div class="job-progress"><i style="width:'+(j.progress||0)+'%"></i></div>':'';
