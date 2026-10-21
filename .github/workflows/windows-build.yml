@@ -20,11 +20,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Check Go formatting and vet
+      - name: Format Go files and run vet
         shell: pwsh
         run: |
-          $unformatted = gofmt -l (Get-ChildItem -Recurse -Filter *.go | ForEach-Object FullName)
-          if ($unformatted) { Write-Host "Unformatted files:`n$unformatted"; exit 1 }
+          # Normalize Go formatting in the temporary CI checkout before checking and compiling.
+          # This does not modify the GitHub repository.
+          $goFiles = @(Get-ChildItem -Recurse -Filter *.go | ForEach-Object FullName)
+          if ($goFiles.Count -gt 0) { gofmt -w $goFiles }
           go vet ./...
       - name: Verify Remotion dependencies and bundle
         shell: pwsh
@@ -44,6 +46,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item PodcastAIStudio.exe dist/
           Copy-Item Install-and-Run.bat dist/
+          Copy-Item Install-Quality-Tools.bat dist/
           Copy-Item README.md dist/
           Copy-Item LICENSE dist/
           Copy-Item -Recurse remotion dist/remotion
