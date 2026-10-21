@@ -127,7 +127,7 @@ func SelectHighlights(ctx context.Context, cues []Cue, n int, minS, maxS float64
 			Max          int         `json:"max_clips"`
 		}{shortlist, instructions, n}
 		b, _ := json.Marshal(request)
-		prompt := "You are the short-form EDITOR and quality reviewer for a marketing/SEO guest podcast. New viewers have no context. Select ONLY moments that stand alone: the hook introduces WHO or WHAT is being discussed, explains jargon if needed, and makes a specific promise. Reject excerpts starting mid-thought (like 'and that's why', 'this thing', 'he said') without identifying their referent. It is better to return fewer clips than confusing clips. Write a meaningful accurate title (max 70 chars) and a short reason naming the context. Never invent quotations, details, timestamps, or speakers. Output ONLY valid JSON of this exact shape: {\"clips\":[{\"id\":2,\"title\":\"Why Exact Match Domains Still Matter\",\"reason\":\"Introduces the EMD question and explains its answer.\"}]}. Use only candidate IDs provided, maximum max_clips. Input:\n" + string(b)
+		prompt := "You are the short-form EDITOR and quality reviewer for a marketing/SEO guest podcast. New viewers have no context. Select ONLY moments that stand alone: the hook introduces WHO or WHAT is being discussed, explains jargon if needed, and makes a specific promise. Reject excerpts starting mid-thought (like 'and that's why', 'this thing', 'he said') without identifying their referent. Return up to max_clips DIFFERENT standalone moments, ranked strongest first. Aim for max_clips whenever enough usable moments exist. Do not invent moments to meet the count. Write a meaningful accurate title (max 70 chars) and a short reason naming the context. Never invent quotations, details, timestamps, or speakers. Output ONLY valid JSON of this exact shape: {\"clips\":[{\"id\":2,\"title\":\"Why Exact Match Domains Still Matter\",\"reason\":\"Introduces the EMD question and explains its answer.\"}]}. Use only candidate IDs provided, maximum max_clips. Input:\n" + string(b)
 		response, err := AskModel(ctx, provider, prompt)
 		if err != nil {
 			return nil, fmt.Errorf("AI request failed (local fallback available by selecting Heuristic): %w", err)
@@ -164,8 +164,19 @@ func SelectHighlights(ctx context.Context, cues []Cue, n int, minS, maxS float64
 				}
 			}
 		}
+		// Keep the requested clip count when there are enough distinct passages.
+		// Fallback entries are NOT claimed to be AI-approved; each needs review.
+		for _, candidate := range pool {
+			if len(chosen) >= n {
+				break
+			}
+			if !seen[candidate.ID] {
+				chosen = append(chosen, candidate)
+				seen[candidate.ID] = true
+			}
+		}
 		if len(chosen) == 0 {
-			return nil, errors.New("AI did not select any valid candidates")
+			return nil, errors.New("no non-overlapping candidates found")
 		}
 	}
 	if len(chosen) > n {
@@ -175,6 +186,11 @@ func SelectHighlights(ctx context.Context, cues []Cue, n int, minS, maxS float64
 	for i, c := range chosen {
 		summary := cleanTitle(c.Text)
 		reason := "Review the opening and ending: this clip has not passed a full context audit."
+		if provider.Provider != "local" && provider.Provider != "heuristic" && provider.Provider != "" {
+			if _, ok := metas[c.ID]; !ok {
+				reason = "Additional ranked candidate, not selected by the AI model. Check its opening context and spoken words before publishing."
+			}
+		}
 		if v, ok := metas[c.ID]; ok {
 			if v.Title != "" {
 				summary = v.Title
