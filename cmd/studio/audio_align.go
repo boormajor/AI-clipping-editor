@@ -31,8 +31,9 @@ func findAlignmentScript() (string, error) {
 // No cloud API or fabricated subtitle timings. It performs only on user request.
 func (a *application) alignSelected(w http.ResponseWriter, r *http.Request) {
 	var q struct {
-		ID    string `json:"id"`
-		Model string `json:"model"`
+		ID       string `json:"id"`
+		Model    string `json:"model"`
+		Language string `json:"language"`
 	}
 	if err := decode(r, &q); err != nil {
 		fail(w, 400, err.Error())
@@ -95,7 +96,20 @@ func (a *application) alignSelected(w http.ResponseWriter, r *http.Request) {
 	if model == "" {
 		model = "small"
 	}
-	cmd := exec.CommandContext(ctx, python, script, "--audio", audio, "--reference", ref, "--output", out, "--model", model)
+	language := strings.ToLower(strings.TrimSpace(q.Language))
+	if language == "" {
+		language = "en"
+	}
+	for _, r := range language { // guard: language codes are short ascii letters only
+		if !(r >= 'a' && r <= 'z') {
+			language = "en"
+			break
+		}
+	}
+	if len(language) > 5 {
+		language = "en"
+	}
+	cmd := exec.CommandContext(ctx, python, script, "--audio", audio, "--reference", ref, "--output", out, "--model", model, "--language", language)
 	var log bytes.Buffer
 	cmd.Stdout = &log
 	cmd.Stderr = &log
@@ -131,6 +145,7 @@ func (a *application) alignSelected(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	a.project.LastUpdated = time.Now()
+	a.persistProjectLocked()
 	a.mu.Unlock()
 	reply(w, map[string]any{"words": len(result.Words), "agreement": result.ReferenceAgreement, "warning": result.Warning, "method": result.Method})
 }

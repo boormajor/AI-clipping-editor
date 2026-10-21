@@ -33,7 +33,7 @@ func TestRenderRemotionNeverFallsBackToFFmpeg(t *testing.T) {
 	}
 	p := Project{Duration: 10, Config: Defaults()}
 	c := Clip{Start: 0, End: 4}
-	_, _, err := RenderRemotion(context.Background(), p, c)
+	_, _, err := RenderRemotion(context.Background(), p, c, nil)
 	if err == nil {
 		t.Fatal("Remotion render must require Node dependencies")
 	}

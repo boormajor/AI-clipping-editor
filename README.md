@@ -52,7 +52,7 @@ Do not commit `.quality-venv/`, credentials, real recordings or generated clips 
 
 ## Current implementation and roadmap
 
-**Implemented in source:** Remotion rendering backend and motion-caption composition with an automatic FFmpeg fallback (burns the original SRT cue boundaries when Node/Remotion is unavailable, never fabricated word timings), caption font/color settings, optional real audio alignment, optional frame/scene observations, editorial review endpoint, two-person and shot-plan layouts, project persistence, safe source processing, local preview, API/plan-based LLM selection.
+**Implemented in source:** Remotion rendering backend and motion-caption composition with an automatic FFmpeg fallback (burns the original SRT cue boundaries when Node/Remotion is unavailable, never fabricated word timings), caption font/color settings, optional real audio alignment, optional frame/scene observations, editorial review endpoint, two-person and shot-plan layouts, project persistence, safe source processing, local preview, API/plan-based LLM selection, render progress and cancellation, a render queue and project that survive an app restart, transcript/caption text editing, filler-word and dead-air cleanup (from measured word timing), multi-language caption alignment, keyword/number emphasis, aspect-ratio presets, batch rendering, and honest YouTube/social metadata generation.
 
 **Requires real Windows testing:** npm/Chrome/codec initialization, WhisperX CUDA installation, account sign-in sessions, large videos, rendering throughput. GitHub CI verifies Go tests and Remotion bundling; this is not the same as real editing quality validation.
 

@@ -26,10 +26,12 @@ import (
 )
 
 type application struct {
-	auth    *chatAuth
-	mu      sync.Mutex
-	project studio.Project
-	jobs    map[string]*job
+	auth     *chatAuth
+	mu       sync.Mutex
+	project  studio.Project
+	jobs     map[string]*job
+	cancels  map[string]context.CancelFunc
+	stateDir string
 }
 type job struct {
 	ID       string    `json:"id"`
@@ -39,6 +41,7 @@ type job struct {
 	Error    string    `json:"error,omitempty"`
 	Log      string    `json:"log,omitempty"`
 	Renderer string    `json:"renderer,omitempty"`
+	Progress int       `json:"progress"`
 	Started  time.Time `json:"started"`
 }
 type apiError struct {
@@ -57,7 +60,12 @@ func main() {
 	if authErr != nil {
 		log.Fatal("ChatGPT credential storage: ", authErr)
 	}
-	a := &application{auth: auth, project: studio.Project{Name: "Untitled Podcast", Config: studio.Defaults(), Clips: []studio.Clip{}, Cues: []studio.Cue{}}, jobs: map[string]*job{}}
+	a := &application{auth: auth, project: studio.Project{Name: "Untitled Podcast", Config: studio.Defaults(), Clips: []studio.Clip{}, Cues: []studio.Cue{}}, jobs: map[string]*job{}, cancels: map[string]context.CancelFunc{}}
+	if dir, e := os.UserConfigDir(); e == nil {
+		a.stateDir = filepath.Join(dir, "PodcastAIStudio")
+		_ = os.MkdirAll(a.stateDir, 0700)
+		a.loadState()
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/status", a.status)
 	mux.HandleFunc("GET /api/auth/status", a.authStatus)
@@ -71,6 +79,10 @@ func main() {
 	mux.HandleFunc("POST /api/analyze", a.analyze)
 	mux.HandleFunc("POST /api/clip", a.clip)
 	mux.HandleFunc("POST /api/render", a.render)
+	mux.HandleFunc("POST /api/render/cancel", a.renderCancel)
+	mux.HandleFunc("POST /api/transcript", a.editTranscript)
+	mux.HandleFunc("POST /api/clean", a.cleanClip)
+	mux.HandleFunc("POST /api/metadata", a.generateMetadata)
 	mux.HandleFunc("POST /api/align", a.alignSelected)
 	mux.HandleFunc("POST /api/review", a.reviewSelected)
 	mux.HandleFunc("GET /api/jobs", a.getJobs)
@@ -197,6 +209,7 @@ func (a *application) load(w http.ResponseWriter, r *http.Request) {
 	}
 	a.mu.Lock()
 	a.project = studio.Project{Name: name, VideoPath: q.VideoPath, TranscriptPath: q.TranscriptPath, OutputDir: q.OutputDir, Duration: duration, Cues: cues, Clips: []studio.Clip{}, Config: studio.Defaults(), LastUpdated: time.Now()}
+	a.persistProjectLocked()
 	a.mu.Unlock()
 	a.status(w, r)
 }
@@ -222,6 +235,7 @@ func (a *application) configure(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	a.project.Config = config
 	a.project.LastUpdated = time.Now()
+	a.persistProjectLocked()
 	a.mu.Unlock()
 	a.status(w, r)
 }
@@ -277,6 +291,7 @@ func (a *application) analyze(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	a.project.Clips = clips
 	a.project.LastUpdated = time.Now()
+	a.persistProjectLocked()
 	a.mu.Unlock()
 	a.status(w, r)
 }
@@ -313,6 +328,7 @@ func (a *application) clip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.project.LastUpdated = time.Now()
+	a.persistProjectLocked()
 	reply(w, map[string]any{"ok": true})
 }
 func (a *application) render(w http.ResponseWriter, r *http.Request) {
@@ -345,18 +361,27 @@ func (a *application) render(w http.ResponseWriter, r *http.Request) {
 	j := &job{ID: id, ClipID: c.ID, Status: "queued", Started: time.Now()}
 	a.jobs[id] = j
 	a.pruneJobsLocked()
+	ctx, cancel := context.WithTimeout(context.Background(), studio.RenderTimeout())
+	a.cancels[id] = cancel
+	a.persistJobsLocked()
 	a.mu.Unlock()
 	go func() {
+		defer cancel()
 		a.mu.Lock()
 		j.Status = "rendering"
 		a.mu.Unlock()
-		ctx, cancel := context.WithTimeout(context.Background(), studio.RenderTimeout())
-		defer cancel()
+		onProgress := func(pct int) {
+			a.mu.Lock()
+			if pct > j.Progress {
+				j.Progress = pct
+			}
+			a.mu.Unlock()
+		}
 		// Remotion is the primary renderer. If it is unavailable (no Node/npm
 		// install yet) or fails, fall back to the FFmpeg renderer so a clip still
 		// exports. The fallback burns the original SRT cue boundaries — it never
 		// fabricates word timings.
-		out, debug, err := studio.RenderRemotion(ctx, p, c)
+		out, debug, err := studio.RenderRemotion(ctx, p, c, onProgress)
 		renderer := "remotion"
 		if err != nil && ctx.Err() == nil {
 			fbOut, fbDebug, fbErr := studio.Render(ctx, p, c)
@@ -369,17 +394,44 @@ func (a *application) render(w http.ResponseWriter, r *http.Request) {
 		}
 		a.mu.Lock()
 		defer a.mu.Unlock()
+		delete(a.cancels, id)
 		j.Log = limit(debug, 1000)
 		j.Renderer = renderer
-		if err != nil {
+		switch {
+		case err != nil && ctx.Err() == context.Canceled:
+			j.Status = "canceled"
+			j.Error = "Render canceled"
+		case err != nil:
 			j.Status = "failed"
 			j.Error = err.Error()
-		} else {
+		default:
 			j.Status = "complete"
 			j.Output = out
+			j.Progress = 100
 		}
+		a.persistJobsLocked()
 	}()
 	reply(w, map[string]any{"id": id, "status": "queued"})
+}
+
+// renderCancel stops an in-flight render by canceling its context.
+func (a *application) renderCancel(w http.ResponseWriter, r *http.Request) {
+	var q struct {
+		ID string `json:"id"`
+	}
+	if e := decode(r, &q); e != nil {
+		fail(w, 400, e.Error())
+		return
+	}
+	a.mu.Lock()
+	cancel, ok := a.cancels[q.ID]
+	a.mu.Unlock()
+	if !ok {
+		fail(w, 404, "No active render with that id")
+		return
+	}
+	cancel()
+	reply(w, map[string]bool{"ok": true})
 }
 
 // pruneJobsLocked keeps the in-memory job map bounded by dropping the oldest
@@ -472,6 +524,7 @@ func (a *application) open(w http.ResponseWriter, r *http.Request) {
 	}
 	a.mu.Lock()
 	a.project = p
+	a.persistProjectLocked()
 	a.mu.Unlock()
 	a.status(w, r)
 }

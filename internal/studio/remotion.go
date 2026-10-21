@@ -1,16 +1,51 @@
 package studio
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 )
+
+// lineWriter buffers process output and invokes fn for each complete line.
+// Safe for the concurrent stdout/stderr writers exec may use.
+type lineWriter struct {
+	mu      sync.Mutex
+	all     bytes.Buffer
+	partial []byte
+	fn      func(string)
+}
+
+func (w *lineWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.all.Write(p)
+	w.partial = append(w.partial, p...)
+	for {
+		i := bytes.IndexByte(w.partial, '\n')
+		if i < 0 {
+			break
+		}
+		line := string(w.partial[:i])
+		w.partial = w.partial[i+1:]
+		if w.fn != nil {
+			w.fn(line)
+		}
+	}
+	return len(p), nil
+}
+func (w *lineWriter) String() string { w.mu.Lock(); defer w.mu.Unlock(); return w.all.String() }
+
+var reRendered = regexp.MustCompile(`Rendered\s+(\d+)/(\d+)`)
+var reEncoded = regexp.MustCompile(`Encoded\s+(\d+)/(\d+)`)
 
 type remotionAsset struct {
 	Media    string  `json:"media"`
@@ -40,6 +75,7 @@ type remotionProps struct {
 	Callout       string          `json:"callout"`
 	Graphics      bool            `json:"graphics"`
 	Zoom          bool            `json:"zoom"`
+	Emphasis      bool            `json:"emphasis"`
 }
 
 func FindRemotion() (string, error) {
@@ -94,7 +130,7 @@ func makeRemotionProps(p Project, c Clip) (remotionProps, error) {
 	x := remotionProps{Duration: dur, Width: cfg.Width, Height: cfg.Height, FPS: cfg.FPS, Layout: c.Layout, Pan: c.Pan, Shots: c.Shots, Cues: []Cue{}, Words: c.Words,
 		Assets: []remotionAsset{}, Captions: cfg.Captions && c.Captions, CaptionPreset: c.CaptionStyle, CaptionFont: validCaptionFont(cfg.CaptionFont),
 		CaptionSize: cfg.CaptionSize, CaptionColor: color(cfg.CaptionColor, "#FFFFFF"), AccentColor: color(cfg.AccentColor, "#FACC15"),
-		CaptionOffset: cfg.CaptionOffset, Title: c.Title, Callout: c.Callout, Graphics: cfg.Graphics, Zoom: cfg.Zoom}
+		CaptionOffset: cfg.CaptionOffset, Title: c.Title, Callout: c.Callout, Graphics: cfg.Graphics, Zoom: cfg.Zoom, Emphasis: cfg.CaptionEmphasis}
 	if x.CaptionPreset == "" {
 		x.CaptionPreset = cfg.CaptionStyle
 	}
@@ -129,7 +165,7 @@ func makeRemotionProps(p Project, c Clip) (remotionProps, error) {
 	}
 	return x, nil
 }
-func RenderRemotion(ctx context.Context, p Project, c Clip) (string, string, error) {
+func RenderRemotion(ctx context.Context, p Project, c Clip, onProgress func(int)) (string, string, error) {
 	root, e := FindRemotion()
 	if e != nil {
 		return "", "", e
@@ -192,9 +228,36 @@ func RenderRemotion(ctx context.Context, p Project, c Clip) (string, string, err
 	}
 	render := exec.CommandContext(ctx, npx, "--no-install", "remotion", "render", "src/index.ts", "PodcastClip", out, "--props", propFile, "--codec", "h264")
 	render.Dir = root
-	logs, err := render.CombinedOutput()
-	if err != nil {
-		return "", string(logs), fmt.Errorf("Remotion render failed: %w", err)
+	lw := &lineWriter{fn: func(line string) {
+		if onProgress == nil {
+			return
+		}
+		// Render phase maps to 5-85%, encode phase to 85-100%.
+		if m := reRendered.FindStringSubmatch(line); m != nil {
+			done, _ := strconv.Atoi(m[1])
+			total, _ := strconv.Atoi(m[2])
+			if total > 0 {
+				onProgress(5 + done*80/total)
+			}
+		} else if m := reEncoded.FindStringSubmatch(line); m != nil {
+			done, _ := strconv.Atoi(m[1])
+			total, _ := strconv.Atoi(m[2])
+			if total > 0 {
+				onProgress(85 + done*15/total)
+			}
+		}
+	}}
+	render.Stdout = lw
+	render.Stderr = lw
+	if onProgress != nil {
+		onProgress(3)
 	}
-	return out, string(logs), nil
+	err := render.Run()
+	if err != nil {
+		return "", lw.String(), fmt.Errorf("Remotion render failed: %w", err)
+	}
+	if onProgress != nil {
+		onProgress(100)
+	}
+	return out, lw.String(), nil
 }

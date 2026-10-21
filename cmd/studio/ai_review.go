@@ -189,6 +189,7 @@ func (a *application) reviewSelected(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	a.project.LastUpdated = time.Now()
+	a.persistProjectLocked()
 	a.mu.Unlock()
 	reply(w, map[string]any{"title": v.Title, "contextOK": v.ContextOK, "issues": v.Issues, "layout": v.Layout, "shots": v.Shots, "captionVerified": v.CaptionVerified, "summary": v.Summary, "faceData": faceInfo != "Not available (face tracking tool not installed)."})
 }

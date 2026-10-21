@@ -38,9 +38,19 @@ export type EditProps = {
   cues:Cue[]; words:Word[]; assets:Asset[];
   captions:boolean; captionPreset:CaptionPreset;
   captionFont:string; captionSize:number; captionColor:string; accentColor:string;
-  captionOffset:number; title:string; callout:string; graphics:boolean; zoom:boolean;
+  captionOffset:number; title:string; callout:string; graphics:boolean; zoom:boolean; emphasis?:boolean;
 };
-const defaults:EditProps={media:'example.mp4',duration:5,width:1080,height:1920,fps:30,layout:'two-up',pan:.5,shots:[],cues:[],words:[],assets:[],captions:true,captionPreset:'kinetic',captionFont:'Arial',captionSize:76,captionColor:'#FFFFFF',accentColor:'#FACC15',captionOffset:0,title:'',callout:'',graphics:false,zoom:false};
+// Power words / numbers get accent emphasis when the "emphasis" option is on.
+const POWER=new Set(['now','new','free','stop','never','always','secret','how','why','best','worst','biggest','mistake','proven','instantly','fast','easy','money','growth','win','warning','huge','important','truth','results','million','billion','everyone','nobody','everything','nothing']);
+function isEmph(raw:string):boolean{
+ const w=raw.toLowerCase().replace(/[^a-z0-9]/g,'');
+ if(!w)return false;
+ if(/[0-9]/.test(w))return true;
+ const letters=raw.replace(/[^A-Za-z]/g,'');
+ if(letters.length>=2 && raw===raw.toUpperCase() && /[A-Z]/.test(raw))return true;
+ return POWER.has(w);
+}
+const defaults:EditProps={media:'example.mp4',duration:5,width:1080,height:1920,fps:30,layout:'two-up',pan:.5,shots:[],cues:[],words:[],assets:[],captions:true,captionPreset:'kinetic',captionFont:'Arial',captionSize:76,captionColor:'#FFFFFF',accentColor:'#FACC15',captionOffset:0,title:'',callout:'',graphics:false,zoom:false,emphasis:false};
 const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
 function shotAt(t:number,p:EditProps):Shot {
  const found=p.shots?.find(s=>t>=s.start&&t<s.end);
@@ -86,7 +96,7 @@ function captionGroups(words:Word[]):Word[][]{
 }
 // One measured word, animated per the active caption spec. Nothing here invents
 // timing: reveal/punch/wipe are all driven by the word's own measured start/end.
-function WordSpan({w,spec,t,accent,base}:{w:Word;spec:CaptionSpec;t:number;accent:string;base:string}){
+function WordSpan({w,spec,t,accent,base,emph}:{w:Word;spec:CaptionSpec;t:number;accent:string;base:string;emph:boolean}){
  const active=t>=w.start&&t<w.end;
  const revealed=!spec.reveal||t>=w.start-.001;
  const popIn=spec.reveal&&(spec.word==='punch')?interpolate(t-w.start,[0,.08,.2],[.6,1.12,1],{extrapolateLeft:'clamp',extrapolateRight:'clamp',easing:Easing.out(Easing.cubic)}):1;
@@ -108,6 +118,8 @@ function WordSpan({w,spec,t,accent,base}:{w:Word;spec:CaptionSpec;t:number;accen
  }else{
   style.color=base;
  }
+ // Keyword emphasis: lift non-active power words/numbers to the accent color.
+ if(emph&&!active&&spec.word!=='box'&&spec.word!=='wipe'&&style.color===base&&isEmph(w.word))style.color=accent;
  return <><span style={style}>{w.word}</span>{' '}</>;
 }
 function CaptionLayer({p}:{p:EditProps}){
@@ -134,7 +146,8 @@ function CaptionLayer({p}:{p:EditProps}){
  if(!text.trim())return null;
  return <AbsoluteFill style={{justifyContent:'flex-end',alignItems:'center',pointerEvents:'none',paddingBottom:Math.max(110,Math.round(height*.16))}}>
   <div style={{maxWidth:'91%',padding:box?'16px 24px':'10px 8px',borderRadius:box?22:8,background:box?'rgba(8,13,28,.88)':'transparent',transform:`translateY(${tx}px) scale(${scale})`,opacity:fade,textAlign:'center',fontFamily:p.captionFont||'Arial',fontWeight:850,fontSize,lineHeight:1.14,letterSpacing:-1.1,color:baseColor,textShadow:box?'0 2px 8px rgba(0,0,0,.5)':'0 4px 4px rgba(0,0,0,.95),0 0 12px rgba(0,0,0,.85)',WebkitTextStroke:spec.stroke?'2px rgba(0,0,0,.82)':'0',overflowWrap:'break-word'}}>
- {group ? group.map((w,i)=><WordSpan key={i} w={w} spec={spec} t={t} accent={accent} base={baseColor}/>) : text}
+ {group ? group.map((w,i)=><WordSpan key={i} w={w} spec={spec} t={t} accent={accent} base={baseColor} emph={!!p.emphasis}/>)
+   : (p.emphasis ? text.split(/\s+/).map((tok,i)=><React.Fragment key={i}><span style={{color:isEmph(tok)?accent:baseColor}}>{tok}</span>{' '}</React.Fragment>) : text)}
  </div>
  </AbsoluteFill>;
 }

@@ -42,26 +42,27 @@ type Broll struct {
 	Duration float64 `json:"duration"`
 }
 type Config struct {
-	Preset        string  `json:"preset"`
-	Captions      bool    `json:"captions"`
-	Reframe       bool    `json:"reframe"`
-	Zoom          bool    `json:"zoom"`
-	Broll         bool    `json:"broll"`
-	Stock         bool    `json:"stock"`
-	Graphics      bool    `json:"graphics"`
-	Transitions   bool    `json:"transitions"`
-	Sfx           bool    `json:"sfx"`
-	CaptionStyle  string  `json:"captionStyle"`
-	CaptionFont   string  `json:"captionFont"`
-	CaptionSize   int     `json:"captionSize"`
-	CaptionColor  string  `json:"captionColor,omitempty"`
-	AccentColor   string  `json:"accentColor,omitempty"`
-	CaptionOffset float64 `json:"captionOffset"` // seconds; shift transcripts to sync with soundtrack
-	Width         int     `json:"width"`
-	Height        int     `json:"height"`
-	FPS           int     `json:"fps"`
-	GPU           bool    `json:"gpu"`
-	Instructions  string  `json:"instructions"`
+	Preset          string  `json:"preset"`
+	Captions        bool    `json:"captions"`
+	Reframe         bool    `json:"reframe"`
+	Zoom            bool    `json:"zoom"`
+	Broll           bool    `json:"broll"`
+	Stock           bool    `json:"stock"`
+	Graphics        bool    `json:"graphics"`
+	Transitions     bool    `json:"transitions"`
+	Sfx             bool    `json:"sfx"`
+	CaptionStyle    string  `json:"captionStyle"`
+	CaptionEmphasis bool    `json:"captionEmphasis"`
+	CaptionFont     string  `json:"captionFont"`
+	CaptionSize     int     `json:"captionSize"`
+	CaptionColor    string  `json:"captionColor,omitempty"`
+	AccentColor     string  `json:"accentColor,omitempty"`
+	CaptionOffset   float64 `json:"captionOffset"` // seconds; shift transcripts to sync with soundtrack
+	Width           int     `json:"width"`
+	Height          int     `json:"height"`
+	FPS             int     `json:"fps"`
+	GPU             bool    `json:"gpu"`
+	Instructions    string  `json:"instructions"`
 }
 type Project struct {
 	Name           string    `json:"name"`
