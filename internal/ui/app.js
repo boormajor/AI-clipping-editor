@@ -111,14 +111,6 @@ $('aiReview').onclick=()=>busy($('aiReview'),async()=>{
  $('aiReviewSummary').textContent=(result.contextOK?'Context reviewed. ':'Missing context. ')+(result.issues||[]).join(' • ')+(result.faceData?' · Face metadata reviewed.':' · No measured face data available.');
  toast('AI updated the title and proposed framing. Review before rendering.');
 });
-$('visionCheck').onclick=()=>busy($('visionCheck'),async()=>{
- const c=chosen();if(!c)throw Error('Select a clip first');
- $('visionStatus').textContent='Inspecting frames locally…';
- const r=await api('vision',{clipId:c.id,model:'gemma3:4b'});
- const v=r.review||{};
- $('visionStatus').textContent=(v.recommendation||'Review')+' — '+(v.reason||'Check the preview.');
- toast('Local AI inspected sample frames; review its recommendation before changing layout.');
-});
 // Batch: render every suggested clip
 $('renderAll').onclick=()=>busy($('renderAll'),async()=>{
  const list=(project.clips||[]).filter(c=>c.selected!==false);
