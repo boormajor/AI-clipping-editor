@@ -173,12 +173,16 @@ func (a *application) load(w http.ResponseWriter, r *http.Request) {
 		TranscriptPath string `json:"transcriptPath"`
 		OutputDir      string `json:"outputDir"`
 		Name           string `json:"name"`
+		SpeechProvider string `json:"speechProvider"`
+		SpeechKey string `json:"speechKey"`
+		SpeechLanguage string `json:"speechLanguage"`
 	}
 	if e := decode(r, &q); e != nil {
 		fail(w, 400, e.Error())
 		return
 	}
-	for _, path := range []string{q.VideoPath, q.TranscriptPath} {
+	paths:=[]string{q.VideoPath};if q.TranscriptPath!=""{paths=append(paths,q.TranscriptPath)}
+ for _, path := range paths {
 		info, e := os.Stat(path)
 		if e != nil || info.IsDir() {
 			fail(w, 400, "Cannot read source file: "+path)
@@ -194,21 +198,27 @@ func (a *application) load(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, e.Error())
 		return
 	}
-	cues, plain, e := studio.LoadTranscript(q.TranscriptPath)
-	if e != nil {
-		fail(w, 400, e.Error())
-		return
-	}
-	if len(cues) == 0 {
-		fail(w, 422, "Your transcript has no usable timestamps. Export SRT or VTT from Descript, or align this document using an external transcript-alignment tool before importing. Text sample: "+limit(plain, 100))
-		return
+	var cues []studio.Cue
+	var words []studio.Word
+	if q.TranscriptPath!="" {
+		parsed, plain, err:=studio.LoadTranscript(q.TranscriptPath)
+		if err!=nil {fail(w,400,err.Error());return}
+		if len(parsed)==0 {fail(w,422,"Transcript has no usable timestamps: "+limit(plain,100)+". Leave transcript blank to use cloud transcription.");return}
+		cues=parsed
+	} else {
+		ctx,cancel:=context.WithTimeout(r.Context(),45*time.Minute)
+		defer cancel()
+		var err error
+		words,err=studio.TranscribeVideoAudio(ctx,q.VideoPath,duration,studio.CloudSpeech{Provider:q.SpeechProvider,APIKey:q.SpeechKey,Language:q.SpeechLanguage})
+		if err!=nil {fail(w,422,err.Error());return}
+		cues=studio.WordsToCues(words)
 	}
 	name := strings.TrimSpace(q.Name)
 	if name == "" {
 		name = strings.TrimSuffix(filepath.Base(q.VideoPath), filepath.Ext(q.VideoPath))
 	}
 	a.mu.Lock()
-	a.project = studio.Project{Name: name, VideoPath: q.VideoPath, TranscriptPath: q.TranscriptPath, OutputDir: q.OutputDir, Duration: duration, Cues: cues, Clips: []studio.Clip{}, Config: studio.Defaults(), LastUpdated: time.Now()}
+	a.project = studio.Project{Name: name, VideoPath: q.VideoPath, TranscriptPath: q.TranscriptPath, OutputDir: q.OutputDir, Duration: duration, Cues: cues, Words: words, Clips: []studio.Clip{}, Config: studio.Defaults(), LastUpdated: time.Now()}
 	a.persistProjectLocked()
 	a.mu.Unlock()
 	a.status(w, r)
@@ -285,6 +295,7 @@ func (a *application) analyze(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i := range clips {
+		if len(p.Words)>0 { for _,word := range p.Words { if word.Start>=clips[i].Start&&word.End<=clips[i].End {word.Start-=clips[i].Start;word.End-=clips[i].Start;clips[i].Words=append(clips[i].Words,word)} } }
 		clips[i].CaptionStyle = p.Config.CaptionStyle
 		clips[i].Captions = p.Config.Captions
 	}
