@@ -7,20 +7,34 @@ type Cue struct {
 	End   float64 `json:"end"`
 	Text  string  `json:"text"`
 }
+type Word struct {
+	Start float64 `json:"start"`
+	End   float64 `json:"end"`
+	Word  string  `json:"word"`
+}
+type Shot struct {
+	Start float64 `json:"start"`
+	End   float64 `json:"end"`
+	Mode  string  `json:"mode"`
+	Pan   float64 `json:"pan,omitempty"`
+}
 type Clip struct {
-	ID           string  `json:"id"`
-	Title        string  `json:"title"`
-	Start        float64 `json:"start"`
-	End          float64 `json:"end"`
-	Score        float64 `json:"score"`
-	Reason       string  `json:"reason"`
-	Selected     bool    `json:"selected"`
-	Pan          float64 `json:"pan"`    // 0 is left, 0.5 center, 1 right
-	Layout       string  `json:"layout"` // focus or two-up; two-up assumes left/right source split
-	Captions     bool    `json:"captions"`
-	CaptionStyle string  `json:"captionStyle"`
-	Callout      string  `json:"callout"`
-	Broll        []Broll `json:"broll"`
+	ID               string  `json:"id"`
+	Title            string  `json:"title"`
+	Start            float64 `json:"start"`
+	End              float64 `json:"end"`
+	Score            float64 `json:"score"`
+	Reason           string  `json:"reason"`
+	Selected         bool    `json:"selected"`
+	Pan              float64 `json:"pan"`    // 0 is left, 0.5 center, 1 right
+	Layout           string  `json:"layout"` // focus or two-up; two-up assumes left/right source split
+	Captions         bool    `json:"captions"`
+	CaptionStyle     string  `json:"captionStyle"`
+	Callout          string  `json:"callout"`
+	Broll            []Broll `json:"broll"`
+	Words            []Word  `json:"words,omitempty"`
+	Shots            []Shot  `json:"shots,omitempty"`
+	CaptionAgreement float64 `json:"captionAgreement,omitempty"`
 }
 type Broll struct {
 	Path     string  `json:"path"`
@@ -40,6 +54,8 @@ type Config struct {
 	CaptionStyle  string  `json:"captionStyle"`
 	CaptionFont   string  `json:"captionFont"`
 	CaptionSize   int     `json:"captionSize"`
+	CaptionColor  string  `json:"captionColor,omitempty"`
+	AccentColor   string  `json:"accentColor,omitempty"`
 	CaptionOffset float64 `json:"captionOffset"` // seconds; shift transcripts to sync with soundtrack
 	Width         int     `json:"width"`
 	Height        int     `json:"height"`
@@ -66,5 +82,5 @@ type ProviderConfig struct {
 }
 
 func Defaults() Config {
-	return Config{Preset: "simple", Captions: true, Reframe: true, CaptionStyle: "bold", CaptionFont: "Arial", CaptionSize: 76, Width: 1080, Height: 1920, FPS: 30, GPU: true}
+	return Config{Preset: "simple", Captions: true, Reframe: true, CaptionStyle: "kinetic", CaptionFont: "Arial", CaptionSize: 76, CaptionColor: "#FFFFFF", AccentColor: "#FACC15", Width: 1080, Height: 1920, FPS: 30, GPU: true}
 }
