@@ -30,8 +30,8 @@
       <div class="find-fields"><label>How many clips?<input type="number" id="clipCount" min="1" max="30" value="6"></label><label>Minimum duration (sec)<input type="number" id="clipMin" min="10" max="240" value="25"></label><label>Maximum duration (sec)<input type="number" id="clipMax" min="20" max="240" value="65"></label></div>
       <div class="find-bottom"><div><span class="label-small">ANALYSIS</span><strong id="aiSummary">Free local heuristic</strong></div><button class="btn primary" id="analyze">✦ Find best moments</button></div>
      </div>
-     <div class="section-row"><div><h2>Suggested clips <span class="count" id="clipCountBadge">0</span></h2></div><div class="row-actions"><button class="btn subtle" id="renderAll">Render all</button><button class="btn subtle" id="saveClips">Save project</button></div></div>
-     <div id="clipList" class="clip-list"><div class="empty-state"><div class="empty-glyph">✺</div><h3>Your best moments will appear here</h3></div></div>
+     <div class="section-row"><div><h2>Suggested clips <span class="count" id="clipCountBadge">0</span></h2></div><div class="row-actions"><button class="btn subtle" id="reviewAll">Review all with AI</button><button class="btn subtle" id="renderAll">Render all</button><button class="btn subtle" id="saveClips">Save project</button></div></div>
+     <p id="reviewBatchStatus" class="muted smalltext" aria-live="polite"></p><div id="clipList" class="clip-list"><div class="empty-state"><div class="empty-glyph">✺</div><h3>Your best moments will appear here</h3></div></div>
     </div>
     <div class="right-col"><div class="card preview-panel"><div class="section-heading compact"><div><span class="iconbox">▹</span><div><h2>Preview</h2><p id="previewTitle"></p></div></div><span class="mini-badge">9:16 PREVIEW</span></div>
       <div class="preview-stage"><div class="phone-frame"><video id="previewVideo" playsinline controls preload="metadata"></video><div class="preview-caption" id="captionPreview">YOUR CAPTIONS HERE</div><div class="preview-placeholder" id="previewPlaceholder">▷<small>Import video to preview</small></div></div></div>
