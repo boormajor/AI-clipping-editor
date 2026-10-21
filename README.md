@@ -1,74 +1,57 @@
-# Podcast AI Studio — v0.4 Quality Pipeline (Alpha)
+# Podcast AI Studio — Online Speech + Remotion (Alpha)
 
-Windows-first, open-source podcast clipping studio. Import a finished single-camera/split-screen recording and timestamped SRT/VTT, connect ChatGPT Plus or Claude Pro through the existing supported sign-in integration, pick short highlights, improve context, align speech, edit shots, and export **through Remotion**. Nothing publishes automatically.
+A Windows-first podcast clipping editor. Import a video, transcribe it online with **real word timestamps**, select clips using ChatGPT or Claude, customize captions and render with Remotion.
 
-> **Alpha, not a complete commercial OpusClip replacement.** The Windows workflow and real subscription access require on-device verification. Automated quality checks make suggestions and can still be wrong; review the final render. The GUI's video preview is a rough source preview, not a live Remotion composition.
+**Alpha:** editorial review and dynamic framing are not perfect. Always watch the rendered MP4 before publishing. The preview panel shows a simplified source preview rather than the final animated Remotion composition.
 
-## Installation (Windows)
+## Install
 
-1. In [GitHub Actions](https://github.com/boormajor/AI-clipping-editor/actions), download the most recent **successful** `PodcastAIStudio-Windows-x64-alpha` build artifact.
-2. Extract the ENTIRE ZIP, including `remotion/`, `scripts/`, the EXE and `Install-and-Run.bat`.
-3. Double-click `Install-and-Run.bat`. It checks **FFmpeg** and requires **Node.js 20+**. The launcher runs `npm install` inside `remotion/` on first launch (internet needed). Node/Remotion installation can take several minutes. Keep the console window open.
-4. In **AI connections**, use either **Continue with ChatGPT** or **Claude Code login**, subject to plan eligibility and provider limits. API-key modes are available for separately billed API usage. Do not paste account cookies, passwords or subscription tokens into API key fields.
-5. Import the finished video and a timestamped SRT or VTT exported from Descript. Choose a folder for exports, and click **Import episode**.
-6. Choose **Find best moments** with an online model. Select a clip, and use **AI improve clip** for better standalone context, title and a proposed shot plan. Review what it changed.
-7. For best captions, run **Install-Quality-Tools.bat** once, then click **Sync captions to audio** in the clip editor. This runs WhisperX on the *actual audio*, not guessed word timing. Review the transcript agreement and any technical terms.
-8. Choose caption template, font, colors, shot layout, local/Pexels B-roll and effects. Press **Apply clip changes**, then **Render with Remotion**. Open **Render queue** to find the MP4. Save your project for another editing session.
+1. Open [GitHub Actions](https://github.com/boormajor/AI-clipping-editor/actions), select the most recent **successful** Windows build, and download the `PodcastAIStudio-Windows-x64-alpha` artifact.
+2. Extract the **entire** ZIP, including the `remotion/` and `scripts/` folders.
+3. Double-click `Install-and-Run.bat`. Setup installs/checks **FFmpeg**, **Node.js**, and **Remotion**. No Ollama, WhisperX, or local AI model is installed or downloaded. Keep the console open while editing.
 
-### Included and optional tools
+## Transcribe video without an SRT
 
-| Tool | Purpose | Included / Cost |
-|---|---|---|
-| Remotion | **Primary** final video renderer, motion typography, stacked/two-person shots, B-roll compositions (an FFmpeg fallback renders burned-caption clips if Remotion is not installed) | npm install required for motion captions; separate license conditions apply |
-| FFmpeg | Source trimming, soundtrack preparation, codec conversion | Free and open source; installed separately |
-| ChatGPT Plus sign-in / Claude Code | Online LLM for editorial clip selection, review, titles and shot proposals | Subject to plan eligibility and usage limits; API keys optional |
-| WhisperX | Optional speech recognition **and** word-level forced alignment; transcript agreement check | Free code/models; large model downloads and GPU/RAM usage |
-| MediaPipe + OpenCV | Optional sample-frame face occupancy and edge-risk measurements | Free code; installed separately |
-| PySceneDetect | Optional scene-cut metadata to inform online AI review | Free code; installed separately |
-| Pexels | Optional manual free-stock search and downloading | Free API key; usage terms and licensing apply |
+1. In **Studio**, select the podcast MP4/MOV/MKV file. **Leave Transcript empty.**
+2. Under **Cloud transcription**, choose:
+   - **Groq Whisper** (cloud developer API; free tier may be available subject to limits): get a key at [console.groq.com](https://console.groq.com/keys).
+   - **OpenAI Whisper API** (separate pay-as-you-go API billing): get a key from [platform.openai.com](https://platform.openai.com/api-keys).
+3. Paste the selected provider's speech API key into the app. This key is used only for the import request and is not written into your project JSON. Choose language or Automatic.
+4. Choose export folder and click **Import episode**. The app extracts compressed audio with FFmpeg, divides long files into overlapping chunks, transcribes those chunks through the selected hosted API, and assembles the returned measured word timestamps.
+5. Click **Find best moments**. Choose ChatGPT or Claude for editorial selection in **AI Connections** (your existing plan sign-in, where eligible). These providers evaluate *text*; the separate speech service is needed to transcribe the audio.
 
-**Free tools do not guarantee free cloud inference, content licenses, or Remotion commercial rights.** Remotion's free license covers individuals and qualifying small teams; larger teams or commercial automation products may need a paid license. Read [Remotion licensing](https://www.remotion.dev/docs/license/pricing) before commercial use.
+**Important:** ChatGPT Plus and Claude Pro subscriptions do not supply a general Groq/OpenAI audio-transcription API key. You need to create a separate speech API key. Free Groq tier is subject to availability and usage limits.
 
-### AI quality boundaries
+An existing timestamped SRT/VTT can still be imported optionally. That path doesn't automatically create per-word timestamps.
 
-- **Online-first editorial review:** An authorized ChatGPT/Claude model gets the current clip transcript, about 18 seconds before and 14 after, observed face bounding-box metadata (if MediaPipe is installed), real alignment coverage (if WhisperX ran), and scene-cut metadata (if PySceneDetect is installed). It writes a title, flags context problems and may create an editable shot schedule. No unsupported claims that the cloud model watched the recording; the current subscription adapter does **not** send video frames or audio to the online model.
-- **Caption honesty:** With WhisperX, the Remotion animated captions follow actual recognized **word times** and use the recognizer's words. Without WhisperX, subtitles follow the original SRT cue boundaries; words are NOT falsely highlighted as if individually aligned. `Sync captions` may require correcting proper nouns and marketing jargon.
-- **Safer two-speaker framing:** `Both speakers` stacks left/right halves for an existing side-by-side source. `Dynamic` uses a draft shot schedule with both-speaker safety bias; the AI reviewer can propose edits. There is **no reliable automatic speaker-to-camera attribution** yet from a mixed video.
-- **Professional polish:** Remotion adds a range of animated caption styles — kinetic pop, word-by-word reveal, typewriter, word-box highlight, karaoke wipe and fill, and slide/bounce entrances — alongside boxed/editorial/minimal templates, configurable color/font/size, title graphics, fixed or AI-proposed shots, editable layer decisions, and user-supplied B-roll. Per-word animations (reveal, pop, wipe, word-box, karaoke) only engage when real WhisperX word timing is present; without it the whole SRT cue is shown with the chosen entrance, never fabricated per-word timing. Seamless word-perfect alignment, universal face tracking and automatic creative stock selection cannot be promised without correct tools and human review.
-- **Quality vs speed:** Transcription and rendering may take much longer than a clip's runtime. No original video/transcript files are overwritten; temporary staged media is deleted after rendering.
+## Control captions
 
-## Optional quality tools (Windows)
+Open **Editing settings** and change **Words on screen at once** to any value from **1 to 12**. The default is **3 words**. This is the **maximum** words in a Remotion caption group; natural speech pauses and duration limits can make a group shorter.
 
-Run `Install-Quality-Tools.bat` after installing **Python 3.11** and a suitable PyTorch CUDA build for your GPU. It installs WhisperX, MediaPipe and PySceneDetect into a virtual environment in `.quality-venv`. The runtime tries the quality environment automatically when present. Large model weights download on first alignment. WhisperX CPU fallback is slower. Check tool licenses and Python/CUDA compatibility.
+The generated speech transcript includes measured start/end times for every word, so karaoke/pop/highlight effects can follow the speech. This improves timing but audio recognition can still make mistakes, particularly names and technical terminology. Correct recognized text in the editor when necessary.
 
-To install manually from project root:
+Other options include caption style (kinetic, karaoke, boxed, word-box, typewriter, etc.), font, size, emphasis, primary and accent colors, framing, and aspect ratio.
 
-```powershell
-py -3.11 -m venv .quality-venv
-.quality-venv\Scripts\python.exe -m pip install whisperx mediapipe==0.10.21 opencv-python-headless 'scenedetect[opencv]'
-```
+## Architecture
 
-Do not commit `.quality-venv/`, credentials, real recordings or generated clips to GitHub.
+- **Go** local Windows launcher and project API.
+- **Remotion** required motion-caption and video composition engine (FFmpeg fallback remains available for failures).
+- **FFmpeg** audio extraction and video pre-processing.
+- **Groq Whisper or OpenAI Whisper API** remote speech recognition with real word timestamps.
+- **ChatGPT / Claude** for transcript-based clip selection and editorial review through supported authenticated connections.
+- No Ollama local model or WhisperX setup.
 
-## Current implementation and roadmap
+Cloud transcription sends **audio excerpts of your video to the selected speech service**. Online editorial AI receives transcript excerpts. Check your cloud provider's privacy terms and API pricing.
 
-**Implemented in source:** Remotion rendering backend and motion-caption composition with an automatic FFmpeg fallback (burns the original SRT cue boundaries when Node/Remotion is unavailable, never fabricated word timings), caption font/color settings, optional real audio alignment, optional frame/scene observations, editorial review endpoint, two-person and shot-plan layouts, project persistence, safe source processing, local preview, API/plan-based LLM selection, render progress and cancellation, a render queue and project that survive an app restart, transcript/caption text editing, filler-word and dead-air cleanup (from measured word timing), multi-language caption alignment, keyword/number emphasis, aspect-ratio presets, batch rendering, and honest YouTube/social metadata generation.
+This release does **not** autonomously watch and rework every rendered frame. It is still under active development.
 
-**Requires real Windows testing:** npm/Chrome/codec initialization, WhisperX CUDA installation, account sign-in sessions, large videos, rendering throughput. GitHub CI verifies Go tests and Remotion bundling; this is not the same as real editing quality validation.
-
-**Not implemented yet:** true online multimodal video+audio understanding through subscription plans; automatic cloud video upload workflow; built-in visual keyframe editor; continuous face tracking; perfect audio-to-face speaker detection; fully automatic licensed B-roll selection and placement; multi-pass render critique and repair; complete sound design; drag/drop multi-track editor. Further work is required for commercial tool parity.
-
-## Developers
+## Developer checks
 
 ```bash
 go test ./...
 cd remotion
-npm install
-npx remotion compositions src/index.ts
-# Build native launcher from repository root:
-go build -o PodcastAIStudio.exe ./cmd/studio
+npm ci
+npx tsc --noEmit
 ```
 
-The Go backend starts on 127.0.0.1; React/Remotion code is in `remotion/src`. Imported videos and cloud auth credentials are never committed. Remotion is a separate runtime project: **the Windows EXE alone is insufficient**.
-
-License: MIT for our application source only. Third-party packages, model weights, Pexels assets and Remotion carry their own licenses.
+The Windows build is created by the repository's GitHub Actions workflow.
