@@ -69,6 +69,8 @@ func main() {
 	mux.HandleFunc("POST /api/analyze", a.analyze)
 	mux.HandleFunc("POST /api/clip", a.clip)
 	mux.HandleFunc("POST /api/render", a.render)
+	mux.HandleFunc("POST /api/align", a.alignSelected)
+	mux.HandleFunc("POST /api/review", a.reviewSelected)
 	mux.HandleFunc("GET /api/jobs", a.getJobs)
 	mux.HandleFunc("POST /api/save", a.save)
 	mux.HandleFunc("POST /api/open", a.open)
@@ -148,7 +150,7 @@ func (a *application) status(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	p := a.project
 	a.mu.Unlock()
-	reply(w, map[string]any{"project": p, "tools": map[string]bool{"ffmpeg": has("ffmpeg"), "ffprobe": has("ffprobe"), "pdftotext": has("pdftotext"), "ollama": has("ollama"), "whisper": has("whisper-cli")}, "version": "0.2.0-alpha"})
+	reply(w, map[string]any{"project": p, "tools": map[string]bool{"ffmpeg": has("ffmpeg"), "ffprobe": has("ffprobe"), "pdftotext": has("pdftotext"), "ollama": has("ollama"), "whisper": has("whisper-cli"), "remotion": studio.RemotionInstalled()}, "version": "0.4.0-alpha"})
 }
 func has(v string) bool { _, e := exec.LookPath(v); return e == nil }
 func (a *application) load(w http.ResponseWriter, r *http.Request) {
@@ -344,7 +346,7 @@ func (a *application) render(w http.ResponseWriter, r *http.Request) {
 		a.mu.Unlock()
 		ctx, cancel := context.WithTimeout(context.Background(), studio.RenderTimeout())
 		defer cancel()
-		out, debug, err := studio.Render(ctx, p, c)
+		out, debug, err := studio.RenderRemotion(ctx, p, c)
 		a.mu.Lock()
 		defer a.mu.Unlock()
 		j.Log = limit(debug, 1000)
