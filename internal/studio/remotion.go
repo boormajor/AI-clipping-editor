@@ -10,7 +10,6 @@ import (
  "runtime"
  "strconv"
  "strings"
- "time"
 )
 
 type remotionAsset struct {Media string `json:"media"`;Start float64 `json:"start"`;Duration float64 `json:"duration"`}
@@ -92,4 +91,3 @@ func RenderRemotion(ctx context.Context,p Project,c Clip)(string,string,error){
  if err!=nil{return "",string(logs),fmt.Errorf("Remotion render failed: %w",err)}
  return out,string(logs),nil
 }
-func RenderTimeout()time.Duration{return 60*time.Minute}
