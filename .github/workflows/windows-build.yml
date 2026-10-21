@@ -49,7 +49,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item PodcastAIStudio.exe dist/
           Copy-Item Install-and-Run.bat dist/
-          Copy-Item Install-Quality-Tools.bat dist/
           Copy-Item README.md dist/
           Copy-Item LICENSE dist/
           Copy-Item -Recurse remotion dist/remotion
