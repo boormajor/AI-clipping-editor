@@ -57,7 +57,8 @@ type Config struct {
 	CaptionSize     int     `json:"captionSize"`
 	CaptionColor    string  `json:"captionColor,omitempty"`
 	AccentColor     string  `json:"accentColor,omitempty"`
-	CaptionOffset   float64 `json:"captionOffset"` // seconds; shift transcripts to sync with soundtrack
+	CaptionOffset   float64 `json:"captionOffset"`
+ CaptionWords int `json:"captionWords"` // seconds; shift transcripts to sync with soundtrack
 	Width           int     `json:"width"`
 	Height          int     `json:"height"`
 	FPS             int     `json:"fps"`
@@ -71,6 +72,7 @@ type Project struct {
 	OutputDir      string    `json:"outputDir"`
 	Duration       float64   `json:"duration"`
 	Cues           []Cue     `json:"cues"`
+ Words          []Word    `json:"words,omitempty"`
 	Clips          []Clip    `json:"clips"`
 	Config         Config    `json:"config"`
 	LastUpdated    time.Time `json:"lastUpdated"`
@@ -83,5 +85,5 @@ type ProviderConfig struct {
 }
 
 func Defaults() Config {
-	return Config{Preset: "simple", Captions: true, Reframe: true, CaptionStyle: "kinetic", CaptionFont: "Arial", CaptionSize: 76, CaptionColor: "#FFFFFF", AccentColor: "#FACC15", Width: 1080, Height: 1920, FPS: 30, GPU: true}
+	return Config{Preset: "simple", Captions: true, Reframe: true, CaptionStyle: "kinetic", CaptionFont: "Arial", CaptionSize: 76, CaptionWords: 3, CaptionColor: "#FFFFFF", AccentColor: "#FACC15", Width: 1080, Height: 1920, FPS: 30, GPU: true}
 }
