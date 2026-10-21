@@ -3,7 +3,7 @@ const $=id=>document.getElementById(id);
 const P={simple:{captions:true,reframe:true,zoom:false,broll:false,stock:false,graphics:false,transitions:false,sfx:false},advanced:{captions:true,reframe:true,zoom:true,broll:true,stock:true,graphics:true,transitions:true,sfx:true}};
 const features=[['Essential editing',[['captions','Generate subtitles'],['reframe','Vertical reframing with adjustable focus'],['zoom','Dynamic zooms and punch-ins']]],['Additional visuals',[['broll','B-roll video layers'],['stock','Search free stock videos (planned)'],['graphics','Motion graphic text callouts'],['transitions','Animated transitions (planned)']]],['Audio editing',[['sfx','Sound effects (planned)']]]];
 let project={clips:[],cues:[],config:{}}, selectedID='', jobs=[], availableTools={}, currentPage='studio';
-let provider={provider:'heuristic',model:'',apiKey:''};
+let provider={provider:'chatgpt',model:'',apiKey:''};
 async function api(path,body){const settings={method:body===undefined?'GET':'POST',headers:{'Accept':'application/json'}};if(body!==undefined){settings.headers['Content-Type']='application/json';settings.body=JSON.stringify(body)}const res=await fetch('/api/'+path,settings);let v;try{v=await res.json()}catch{throw Error('Unexpected server response ('+res.status+')')}if(!res.ok)throw Error(v.error||'Server error '+res.status);return v}
 function toast(s,err=false){const el=$('toast');el.textContent=s;el.classList.toggle('error',err);el.classList.remove('hide');clearTimeout(el._h);el._h=setTimeout(()=>el.classList.add('hide'),5100)}
 async function busy(btn,fn){if(btn.disabled)return;btn.disabled=true;let old=btn.textContent;btn.textContent='Working…';try{await fn()}catch(e){toast(e.message,true)}finally{btn.disabled=false;btn.textContent=old}}
