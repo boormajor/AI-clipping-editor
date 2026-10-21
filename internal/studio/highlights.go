@@ -219,12 +219,6 @@ func AskModel(ctx context.Context, p ProviderConfig, prompt string) (string, err
 			return "", errors.New("select an available ChatGPT model in AI Connections")
 		}
 		return askChatGPTPlan(ctx, p.APIKey, model, prompt)
-	case "ollama":
-		if model == "" {
-			model = "llama3.2"
-		}
-		url = "http://127.0.0.1:11434/api/chat"
-		payload = map[string]any{"model": model, "stream": false, "messages": []map[string]string{{"role": "user", "content": prompt}}, "format": "json"}
 	case "openai":
 		if model == "" {
 			model = "gpt-4.1-mini"
