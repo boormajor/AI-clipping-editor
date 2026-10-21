@@ -52,7 +52,7 @@ func transcribePart(ctx context.Context, audioPath string, cfg CloudSpeech) ([]W
  req.Header.Set("Authorization","Bearer "+cfg.APIKey)
  res,err:=(&http.Client{Timeout:4*time.Minute}).Do(req);if err!=nil{return nil,err};defer res.Body.Close()
  raw,err:=io.ReadAll(io.LimitReader(res.Body,8*1024*1024));if err!=nil{return nil,err}
- if res.StatusCode>=300{return nil,fmt.Errorf("%s transcription failed (HTTP %d): %s",cfg.Provider,res.StatusCode,truncate(string(raw),280))}
+ if res.StatusCode>=300{return nil,fmt.Errorf("%s transcription failed (HTTP %d): %s",cfg.Provider,res.StatusCode,string(raw[:minInt(len(raw),280)]))}
  var result struct{
   Words []Word `json:"words"`
   Text string `json:"text"`
@@ -76,7 +76,7 @@ func TranscribeVideoAudio(ctx context.Context,video string,duration float64,cfg 
   audio:=filepath.Join(tmp,"part.mp3")
   args:=[]string{"-hide_banner","-nostdin","-loglevel","error","-y","-ss",strconv.FormatFloat(start,'f',3,64),"-i",video,"-t",strconv.FormatFloat(end-start,'f',3,64),"-map","0:a:0","-vn","-ac","1","-ar","16000","-c:a","libmp3lame","-b:a","48k",audio}
   cmd:=exec.CommandContext(ctx,"ffmpeg",args...)
-  if out,e:=cmd.CombinedOutput();e!=nil{return nil,fmt.Errorf("could not extract audio near %.0fs: %w: %s",base,e,truncate(string(out),200))}
+  if out,e:=cmd.CombinedOutput();e!=nil{return nil,fmt.Errorf("could not extract audio near %.0fs: %w: %s",base,e,string(out[:minInt(len(out),200)]))}
   part,e:=transcribePart(ctx,audio,cfg)
   if e!=nil{return nil,fmt.Errorf("cloud transcription at %.0f–%.0f seconds: %w",base,end,e)}
   for _,w:=range part{
@@ -91,4 +91,17 @@ func TranscribeVideoAudio(ctx context.Context,video string,duration float64,cfg 
  sort.SliceStable(all,func(i,j int)bool{return all[i].Start<all[j].Start})
  if len(all)==0{return nil,errors.New("speech service found no words in the video")}
  return all,nil
+}
+
+func minInt(a,b int)int{if a<b{return a};return b}
+
+// WordsToCues groups measured words into readable transcript cues for clip selection.
+func WordsToCues(words []Word) []Cue {
+ cues:=make([]Cue,0);group:=[]Word{}
+ flush:=func(){if len(group)==0{return};parts:=make([]string,0,len(group));for _,w:=range group{parts=append(parts,w.Word)};cues=append(cues,Cue{Start:group[0].Start,End:group[len(group)-1].End,Text:strings.Join(parts," ")});group=nil}
+ for _,w:=range words{
+  if len(group)>0{last:=group[len(group)-1];if w.Start-last.End>0.55||w.End-group[0].Start>3.5||len(group)>=13{flush()}}
+  group=append(group,w)
+ }
+ flush();return cues
 }
