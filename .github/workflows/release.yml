@@ -22,6 +22,8 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: remotion/package-lock.json
+      - name: Install FFmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
       - name: Go tests
         run: go test -count=1 ./...
       - name: Remotion dependencies
