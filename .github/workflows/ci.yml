@@ -23,6 +23,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -41,7 +42,8 @@ jobs:
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
       - name: Go tests (race detector)
-        run: go test -race -count=1 ./...
+        shell: bash
+        run: set -o pipefail; go test -race -count=1 -json ./... | node scripts/go-test-annotate.mjs
       - name: Front-end checks
         run: node scripts/check-ui-ids.mjs
       - name: Remotion dependencies
@@ -79,6 +81,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -87,7 +90,8 @@ jobs:
       - name: Install FFmpeg
         uses: FedericoCarboni/setup-ffmpeg@v3
       - name: Go tests
-        run: go test -count=1 ./...
+        shell: bash
+        run: set -o pipefail; go test -count=1 -json ./... | node scripts/go-test-annotate.mjs
       - name: Lint PowerShell
         shell: pwsh
         run: |

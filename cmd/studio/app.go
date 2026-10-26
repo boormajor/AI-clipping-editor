@@ -167,12 +167,6 @@ func (t *toolStatus) get() map[string]bool {
 	return copyBools(t.tools)
 }
 
-func (t *toolStatus) invalidate() {
-	t.mu.Lock()
-	t.checked = time.Time{}
-	t.mu.Unlock()
-}
-
 func copyBools(m map[string]bool) map[string]bool {
 	out := make(map[string]bool, len(m))
 	for k, v := range m {
