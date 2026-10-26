@@ -135,7 +135,8 @@ func videoChain(cfg Config, c Clip) string {
 
 // Render exports a clip with FFmpeg alone. It is the fallback when Remotion
 // is unavailable: captions are burned from cue boundaries, B-roll is overlaid
-// and the callout is drawn as a static banner.
+// and the callout is drawn as a static banner when the local FFmpeg build can
+// draw text (static builds often cannot; the banner is then skipped).
 func Render(ctx context.Context, p Project, c Clip, jobID string) (string, string, error) {
 	if p.VideoPath == "" {
 		return "", "", errors.New("no podcast video selected")
@@ -152,6 +153,28 @@ func Render(ctx context.Context, p Project, c Clip, jobID string) (string, strin
 	if err != nil {
 		return "", "", err
 	}
+	wantCallout := cfg.Graphics && strings.TrimSpace(c.Callout) != ""
+	var logs strings.Builder
+	for attempt := 0; attempt < 2; attempt++ {
+		callout := wantCallout && attempt == 0
+		out, log, err := renderFFmpeg(ctx, p, c, cfg, target, jobID, callout)
+		logs.WriteString(log)
+		if err == nil {
+			return out, logs.String(), nil
+		}
+		if ctx.Err() != nil {
+			return "", logs.String(), err
+		}
+		if callout {
+			logs.WriteString("\n[studio] this FFmpeg build could not draw the callout banner; retrying without it\n")
+			continue
+		}
+		return "", logs.String(), err
+	}
+	return "", logs.String(), errors.New("FFmpeg render failed")
+}
+
+func renderFFmpeg(ctx context.Context, p Project, c Clip, cfg Config, target, jobID string, callout bool) (string, string, error) {
 	temp, err := os.MkdirTemp("", "podcast-studio-render-")
 	if err != nil {
 		return "", "", err
@@ -166,7 +189,7 @@ func Render(ctx context.Context, p Project, c Clip, jobID string) (string, strin
 	if cfg.Captions && c.Captions {
 		finalFilters = append(finalFilters, "ass=captions.ass")
 	}
-	if cfg.Graphics && strings.TrimSpace(c.Callout) != "" {
+	if callout {
 		if err = os.WriteFile(filepath.Join(temp, "callout.txt"), []byte(c.Callout), 0o600); err != nil {
 			return "", "", err
 		}
