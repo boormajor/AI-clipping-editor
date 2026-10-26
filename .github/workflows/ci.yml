@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: Lint and test (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: remotion/package-lock.json
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then echo "Files need gofmt:"; echo "$out"; exit 1; fi
+      - name: go vet
+        run: go vet ./...
+      - name: staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - name: Go tests (race detector)
+        run: go test -race -count=1 ./...
+      - name: Front-end checks
+        run: node scripts/check-ui-ids.mjs
+      - name: Remotion dependencies
+        working-directory: remotion
+        run: npm ci --no-audit --no-fund
+      - name: Remotion type-check and compositions
+        working-directory: remotion
+        run: |
+          npm run typecheck
+          npx remotion compositions src/index.ts
+      - name: Remotion render smoke test
+        working-directory: remotion
+        run: |
+          npx remotion browser ensure
+          npm run smoke
+      - name: Python scripts
+        run: |
+          python3 -m py_compile scripts/face_audit.py scripts/scene_audit.py scripts/ui_smoke.py
+          python3 -m pip install --quiet ruff && ruff check scripts
+      - name: UI smoke test (Playwright)
+        run: |
+          go build -o /tmp/studio ./cmd/studio
+          python3 -m pip install --quiet playwright
+          python3 -m playwright install --with-deps chromium
+          python3 scripts/ui_smoke.py /tmp/studio
+        env:
+          REMOTION_BROWSER: ''
+
+  windows-build:
+    name: Build Windows bundle
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: remotion/package-lock.json
+      - name: Go tests
+        run: go test -count=1 ./...
+      - name: Lint PowerShell
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          $r = Invoke-ScriptAnalyzer -Path scripts -Recurse -Severity Error
+          if ($r) { $r | Format-Table -AutoSize; exit 1 }
+      - name: Remotion dependencies
+        working-directory: remotion
+        run: npm ci --no-audit --no-fund
+      - name: Build
+        shell: pwsh
+        run: ./scripts/Build-Bundle.ps1 -Version "0.0.0-ci+${{ github.sha }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PodcastAIStudio-Windows-x64-ci
+          path: dist/PodcastAIStudio-*.zip
+          retention-days: 14

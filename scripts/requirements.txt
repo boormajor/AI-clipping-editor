@@ -1,0 +1,7 @@
+# Optional helpers for the AI framing review. The app works without them;
+# install them to give the editorial model face-box and scene-cut metadata.
+#   python -m venv .quality-venv
+#   .quality-venv\Scripts\python -m pip install -r scripts/requirements.txt
+mediapipe==0.10.21
+opencv-python-headless>=4.9
+scenedetect[opencv]>=0.6.4

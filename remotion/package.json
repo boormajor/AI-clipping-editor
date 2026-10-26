@@ -1,20 +1,31 @@
 {
   "name": "podcast-ai-studio-remotion",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "private": true,
+  "description": "Remotion composition used by Podcast AI Studio to render captioned podcast clips.",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
-    "render": "remotion render src/index.ts",
-    "compositions": "remotion compositions src/index.ts"
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts PodcastClip out/clip.mp4",
+    "compositions": "remotion compositions src/index.ts",
+    "browser": "remotion browser ensure",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@remotion/cli": "4.0.536",
-    "remotion": "4.0.536",
+    "@remotion/google-fonts": "4.0.536",
+    "@remotion/zod-types": "4.0.536",
     "react": "19.1.1",
-    "react-dom": "19.1.1"
+    "react-dom": "19.1.1",
+    "remotion": "4.0.536",
+    "zod": "4.5.4"
   },
   "devDependencies": {
-    "typescript": "5.9.3",
     "@types/react": "19.1.8",
-    "@types/react-dom": "19.1.6"
+    "@types/react-dom": "19.1.6",
+    "typescript": "5.9.3"
   }
 }

@@ -2,6 +2,8 @@ package studio
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -73,7 +75,13 @@ func SearchStock(ctx context.Context, key, query string) ([]StockVideo, error) {
 			if !allowedVideoURL(f.Link) {
 				continue
 			}
-			if best < 0 || ((f.Height >= 720 && f.Height <= 2160) && f.Width > v.VideoFiles[best].Width) {
+			inRange := f.Height >= 720 && f.Height <= 2160
+			switch {
+			case best < 0:
+				best = i
+			case inRange && !(v.VideoFiles[best].Height >= 720 && v.VideoFiles[best].Height <= 2160):
+				best = i
+			case inRange && f.Width > v.VideoFiles[best].Width:
 				best = i
 			}
 		}
@@ -89,14 +97,29 @@ func allowedVideoURL(raw string) bool {
 	u, e := url.Parse(raw)
 	return e == nil && u.Scheme == "https" && u.Hostname() == "videos.pexels.com"
 }
+
+// StockClient downloads Pexels files; redirects stay on the Pexels CDN.
+var StockClient = &http.Client{
+	Timeout: 10 * time.Minute,
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 5 || !allowedVideoURL(req.URL.String()) {
+			return errors.New("stock download redirected off the Pexels CDN")
+		}
+		return nil
+	},
+}
+
+// DownloadStock saves a Pexels video into dir and returns its path. The file
+// name is derived from the URL so a cached file always matches its source.
 func DownloadStock(ctx context.Context, src, dir string, id int) (string, error) {
 	if !allowedVideoURL(src) {
 		return "", errors.New("only verified Pexels video download URLs are permitted")
 	}
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	target := filepath.Join(dir, "pexels-"+strconv.Itoa(id)+".mp4")
+	sum := sha256.Sum256([]byte(src))
+	target := filepath.Join(dir, "pexels-"+strconv.Itoa(id)+"-"+hex.EncodeToString(sum[:4])+".mp4")
 	if info, e := os.Stat(target); e == nil && info.Size() > 0 {
 		return target, nil
 	}
@@ -104,8 +127,7 @@ func DownloadStock(ctx context.Context, src, dir string, id int) (string, error)
 	if e != nil {
 		return "", e
 	}
-	client := &http.Client{Timeout: 150 * time.Second}
-	resp, e := client.Do(req)
+	resp, e := StockClient.Do(req)
 	if e != nil {
 		return "", e
 	}

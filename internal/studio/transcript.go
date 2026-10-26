@@ -3,20 +3,20 @@ package studio
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"html"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
-var timePattern = regexp.MustCompile(`(?i)(?:\d{1,2}:)?\d{1,2}:\d{2}[.,]\d{1,3}|\d{1,2}:\d{2}:\d{2}`)
 var cueTimeLine = regexp.MustCompile(`(?i)^\s*((?:\d{1,2}:)?\d{1,2}:\d{2}(?:[.,]\d{1,3})?)\s*-->\s*((?:\d{1,2}:)?\d{1,2}:\d{2}(?:[.,]\d{1,3})?)`)
 var stampedLine = regexp.MustCompile(`^\s*\[?((?:\d{1,2}:)?\d{1,2}:\d{2}(?:[.,]\d{1,3})?)\]?\s*[:\-]?\s+(.+)$`)
 var tags = regexp.MustCompile(`<[^>]+>`)
@@ -125,15 +125,29 @@ func normalizeCues(c []Cue) []Cue {
 	}
 	return out
 }
-func LoadTranscript(path string) ([]Cue, string, error) {
+
+// MaxTranscriptBytes caps transcript files read from disk.
+const MaxTranscriptBytes = 32 * 1024 * 1024
+
+// LoadTranscript reads a transcript file. The second result is "timed" when
+// cues carry timestamps, otherwise the plain text that was found.
+func LoadTranscript(ctx context.Context, path string) ([]Cue, string, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 	if ext == ".pdf" {
-		cmd := exec.Command("pdftotext", "-layout", path, "-")
-		buf, e := cmd.Output()
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+		defer cancel()
+		out, e := DefaultTool.Output(ctx, "pdftotext", "-layout", path, "-")
 		if e != nil {
 			return nil, "", fmt.Errorf("PDF extraction requires pdftotext (Poppler): %w", e)
 		}
-		return ParseTranscript("extracted.txt", buf)
+		return ParseTranscript("extracted.txt", []byte(out))
+	}
+	info, e := os.Stat(path)
+	if e != nil {
+		return nil, "", e
+	}
+	if info.Size() > MaxTranscriptBytes {
+		return nil, "", errors.New("transcript file is larger than 32 MB")
 	}
 	b, e := os.ReadFile(path)
 	if e != nil {
@@ -175,6 +189,3 @@ func parseDocx(data []byte) (string, error) {
 	}
 	return "", errors.New("DOCX is missing word/document.xml")
 }
-
-// Timestamp detection is strict: never fabricate cue times for an unaligned document.
-func IsTimestamped(s string) bool { return timePattern.MatchString(s) }

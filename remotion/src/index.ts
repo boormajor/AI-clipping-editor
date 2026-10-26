@@ -1,3 +1,4 @@
 import {registerRoot} from 'remotion';
-import {PodcastRoot} from './podcast';
+import {PodcastRoot} from './Root';
+
 registerRoot(PodcastRoot);

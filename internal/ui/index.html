@@ -1,84 +1,322 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Podcast AI Studio</title><link rel="stylesheet" href="/style.css"></head>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Podcast AI Studio</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
 <body>
 <div class="shell">
- <aside class="sidebar">
-  <div class="brand"><div class="brandmark">◈</div><div><b>PODCAST<span>AI</span></b><small>STUDIO • ALPHA</small></div></div>
-  <div class="navlabel">WORKSPACE</div>
-  <button class="nav active" data-page="studio"><span>▣</span> Studio</button>
-  <button class="nav" data-page="settings"><span>⚑</span> Editing settings</button>
-  <button class="nav" data-page="providers"><span>✦</span> AI connections</button>
-  <button class="nav" data-page="exports"><span>⇩</span> Render queue</button>
-  <div class="navlabel gap-top">PROJECT</div>
-  <button class="nav" id="openProject"><span>◫</span> Open project</button>
-  <button class="nav" id="saveProject"><span>▤</span> Save project</button>
-  <div class="sidebar-bottom"><div class="version">ALPHA</div></div>
- </aside>
- <main class="main">
-  <div class="topbar"><div class="breadcrumb">WORKSPACE <span>/</span> <b id="pageTitle">Studio</b></div><div class="topbar-right"><span class="status-pill" id="toolStatus">Checking tools…</span><button class="btn subtle" id="saveTop">Save changes</button></div></div>
-  <section class="page visible" id="page-studio">
-   <div class="page-heading"><div><h1>Podcast <em>clips.</em></h1></div></div>
-   <div class="import-card card">
-    <div class="section-heading"><div><span class="iconbox">↥</span><div><h2>Import episode</h2></div></div><span class="mini-badge">LOCAL FILES</span></div>
-    <div class="file-row"><div class="file-label">Podcast video <small>MP4 · MOV · MKV</small></div><input id="videoPath" placeholder="Select your podcast recording…"><button class="btn secondary browse" data-kind="video" data-target="videoPath">Browse</button></div>
-    <div class="file-row"><div class="file-label">Transcript <small>Optional · automatically generated from audio</small></div><input id="transcriptPath" placeholder="Optional — leave empty for cloud transcription"><button class="btn secondary browse" data-kind="transcript" data-target="transcriptPath">Browse</button></div>
-    <div class="file-row"><div class="file-label">Cloud transcription <small>Required without transcript</small></div><select id="speechProvider"><option value="groq">Groq Whisper (free tier available)</option><option value="openai">OpenAI Whisper API (separate billing)</option></select><input id="speechKey" type="password" autocomplete="off" placeholder="Speech API key — not saved" /></div><div class="file-row"><div class="file-label">Language <small>Optional</small></div><select id="speechLanguage"><option value="auto">Automatic</option><option value="en">English</option><option value="ur">Urdu</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option></select></div>
-    <div class="file-row"><div class="file-label">Export folder <small>Separate from your sources</small></div><input id="outputDir" placeholder="Optional — defaults beside video"><button class="btn secondary browse" data-kind="folder" data-target="outputDir">Browse</button></div>
-    <div class="import-foot"><span id="projectInfo" class="muted">No podcast imported yet</span><button class="btn primary" id="loadProject">Import episode <span>↗</span></button></div>
-   </div>
-   <div class="studio-grid">
-    <div class="left-col">
-     <div class="card find-card"><div class="section-heading"><div><span class="iconbox purple">✦</span><div><h2>Find clips</h2></div></div></div>
-      <div class="find-fields"><label>How many clips?<input type="number" id="clipCount" min="1" max="30" value="6"></label><label>Minimum duration (sec)<input type="number" id="clipMin" min="10" max="240" value="25"></label><label>Maximum duration (sec)<input type="number" id="clipMax" min="20" max="240" value="65"></label></div>
-      <div class="find-bottom"><div><span class="label-small">ANALYSIS</span><strong id="aiSummary">ChatGPT plan</strong></div><button class="btn primary" id="analyze">✦ Find best moments</button></div>
-     </div>
-     <div class="section-row"><div><h2>Suggested clips <span class="count" id="clipCountBadge">0</span></h2></div><div class="row-actions"><button class="btn subtle" id="reviewAll">Review all with AI</button><button class="btn subtle" id="renderAll">Render all</button><button class="btn subtle" id="saveClips">Save project</button></div></div>
-     <p id="reviewBatchStatus" class="muted smalltext" aria-live="polite"></p><div id="clipList" class="clip-list"><div class="empty-state"><div class="empty-glyph">✺</div><h3>Your best moments will appear here</h3></div></div>
+  <header class="topbar">
+    <div class="brand"><span class="mark" aria-hidden="true">◆</span><span>Podcast AI Studio</span><small id="version">—</small></div>
+    <div class="project-name grow" id="projectName">No episode imported</div>
+    <span class="pill" id="toolPill" title="FFmpeg and Remotion status">Checking tools…</span>
+    <button class="btn ghost sm" id="saveProjectBtn" title="Save project file (Ctrl+S)">Save project</button>
+    <button class="btn ghost sm" id="quitBtn" title="Quit Podcast AI Studio">Quit</button>
+  </header>
+
+  <nav class="rail" aria-label="Main">
+    <div class="label">Workspace</div>
+    <button class="nav" data-route="import"><span class="ico" aria-hidden="true">↥</span>Import</button>
+    <button class="nav" data-route="clips"><span class="ico" aria-hidden="true">▣</span>Clips &amp; editor<span class="badge hide" id="clipBadge">0</span></button>
+    <button class="nav" data-route="settings"><span class="ico" aria-hidden="true">⚙</span>Editing settings</button>
+    <button class="nav" data-route="connections"><span class="ico" aria-hidden="true">✦</span>AI connections</button>
+    <button class="nav" data-route="queue"><span class="ico" aria-hidden="true">⇩</span>Render queue<span class="badge hide" id="queueBadge">0</span></button>
+    <div class="label">Project</div>
+    <button class="nav" id="openProjectBtn"><span class="ico" aria-hidden="true">◫</span>Open project…</button>
+    <button class="nav" id="newProjectBtn"><span class="ico" aria-hidden="true">✚</span>New project</button>
+    <div class="rail-foot">Local only · nothing leaves this PC except the AI requests you enable.</div>
+  </nav>
+
+  <main class="main" id="main" tabindex="-1">
+    <div class="banner hide" id="sessionBanner" role="alert">
+      This tab is not linked to the running app. Open the address printed in the Podcast AI Studio console window, then reload.
     </div>
-    <div class="right-col"><div class="card preview-panel"><div class="section-heading compact"><div><span class="iconbox">▹</span><div><h2>Preview</h2><p id="previewTitle"></p></div></div><span class="mini-badge">9:16 PREVIEW</span></div>
-      <div class="preview-stage"><div class="phone-frame"><video id="previewVideo" playsinline controls preload="metadata"></video><div class="preview-caption" id="captionPreview">YOUR CAPTIONS HERE</div><div class="preview-placeholder" id="previewPlaceholder">▷<small>Import video to preview</small></div></div></div>
-      <div class="preview-meta"><span id="previewTime">00:00–00:00</span><button class="btn secondary small" id="renderSelected" disabled>Render with Remotion ↗</button></div>
-     </div>
-     <div class="card edit-panel"><div class="section-heading compact"><div><span class="iconbox">☷</span><div><h2>Edit clip</h2></div></div></div>
-      <div id="editorEmpty" class="editor-empty">Select a suggested clip to open its editing controls.</div>
-      <div id="editorForm" class="hide"><div class="timeline-panel"><div class="timeline-heading"><strong>Transcript timeline</strong><span>Drag the in/out handles</span></div><div class="timeline-ruler"><span id="timeWindowStart">0:00</span><span id="timeWindowEnd">0:00</span></div><div class="trim-track" id="trimTrack"><div class="cue-stripes" id="cueStripes"></div><div class="trim-selection" id="trimSelection"></div><button id="trimStart" class="trim-handle" type="button" aria-label="Adjust clip start"></button><button id="trimEnd" class="trim-handle" type="button" aria-label="Adjust clip end"></button></div><div class="track-label">B-ROLL LAYERS</div><div class="broll-track" id="brollTrack"></div></div><label class="field">Clip title<input id="editTitle"></label><div class="two-fields"><label class="field">Start (seconds)<input type="number" id="editStart" step="0.01" min="0"></label><label class="field">End (seconds)<input type="number" id="editEnd" step="0.01" min="0"></label></div>
-       <label class="field">Frame layout
-          <select id="editLayout"><option value="focus">Focus — one speaker</option><option value="two-up">Both speakers — stacked</option><option value="dynamic">AI shot plan — solo and both</option></select></label>
-       <p class="layout-note">For a side-by-side podcast, choose Both. AI reviews suggest layouts; final renders use Remotion.</p>
-       <label class="field">Horizontal focus <span id="panLabel">Center</span><input type="range" id="editPan" min="0" max="100" value="50"></label>
-       
-       
-       <div class="review-actions"><button class="btn secondary small" type="button" id="aiReview">AI improve clip</button><select id="syncLang" class="inline-select" title="Caption language"><option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="hi">Hindi</option><option value="ur">Urdu</option><option value="ar">Arabic</option><option value="pt">Portuguese</option><option value="it">Italian</option><option value="ja">Japanese</option><option value="zh">Chinese</option></select><button class="btn secondary small" type="button" id="cleanClip">Clean up dead air</button><button class="btn secondary small" type="button" id="editCaptionsBtn">Edit transcript</button><button class="btn secondary small" type="button" id="genMeta">Titles &amp; tags</button></div>
-       <div id="aiReviewSummary" class="muted smalltext" aria-live="polite"></div>
-       <div id="syncStatus" class="muted smalltext"></div>
-       <div id="cleanStatus" class="muted smalltext"></div>
-       <div id="transcriptEditor" class="transcript-editor hide"></div>
-       <div id="metaOutput" class="meta-output hide"></div>
-       <div class="switchline"><span>Burn subtitles into this clip</span><input type="checkbox" id="editCaptions" checked></div>
-       <label class="field">Subtitle template<select id="editCaptionStyle"><optgroup label="Animated"><option value="kinetic">Kinetic Pop</option><option value="popline">Word-by-word Pop — needs sync</option><option value="typewriter">Typewriter — needs sync</option><option value="wordbox">Word Box Highlight — needs sync</option><option value="wipe">Karaoke Wipe — needs sync</option><option value="karaoke">Karaoke Fill — needs sync</option><option value="bounce">Bounce In</option><option value="slide">Slide Up</option></optgroup><optgroup label="Static"><option value="boxed">Boxed Impact</option><option value="podcast">Podcast professional</option><option value="editorial">Editorial</option><option value="bold">Modern bold</option><option value="minimal">Minimal clean</option><option value="yellow">Yellow pop</option><option value="highlight">Yellow highlight</option></optgroup></select></label>
-       <label class="field">Graphic callout (optional)<input id="editCallout" maxlength="120" placeholder="e.g. WHY THIS SEO STRATEGY WORKS"></label>
-       <div class="broll-area"><div class="broll-head">Local B-roll layers <span id="brollCount">0</span></div><div id="brollList"></div><div class="file-row inline"><input id="brollPath" placeholder="Optional stock/local video file"><button class="btn secondary browse" data-kind="asset" data-target="brollPath">Browse</button></div><div class="two-fields"><label class="field">Overlay from (sec)<input type="number" id="brollStart" value="3" min="0" step="0.1"></label><label class="field">Length (sec)<input type="number" id="brollDuration" value="3" min="0.5" step="0.1"></label></div><button class="btn secondary small" id="addBroll">+ Add B-roll overlay</button>
-        <div class="stock-box"><div class="stock-bar"><strong>Free stock footage</strong><a href="https://www.pexels.com" target="_blank" rel="noopener">Provided by Pexels ↗</a></div>
-        <label class="field">Pexels API key (session only)<input id="pexelsKey" type="password" autocomplete="off" placeholder="Free key from pexels.com/api"></label><div class="file-row inline"><input id="stockQuery" placeholder="e.g. people working at computers"><button class="btn secondary" id="searchStock">Search</button></div><div id="stockResults" class="stock-results"></div></div></div>
-       <button class="btn primary full" id="updateClip">Apply clip changes</button>
+
+    <!-- ========== Import ========== -->
+    <section class="page" id="page-import" aria-labelledby="h-import">
+      <div class="page-head"><div><h1 id="h-import">Import an episode</h1><p>Point the studio at your recording. Transcription with real word timestamps happens in the background.</p></div></div>
+      <div class="steps">
+        <div class="card step">
+          <div class="num" aria-hidden="true">1</div>
+          <div>
+            <h3>Source recording</h3>
+            <p class="lead">MP4, MOV, MKV or WebM. The original file is never modified.</p>
+            <label class="field"><span>Podcast video</span>
+              <div class="file-field"><input id="videoPath" type="text" placeholder="C:\Podcasts\episode-42.mp4" autocomplete="off"><button class="btn browse" data-kind="video" data-target="videoPath" type="button">Browse</button></div>
+              <div class="dropzone" id="dropzone">…or drop the video file here to fill in its name</div>
+              <span class="err" id="videoPathErr"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="card step">
+          <div class="num" aria-hidden="true">2</div>
+          <div>
+            <h3>Transcript</h3>
+            <p class="lead">Leave this empty to transcribe the audio with word-level timing (recommended). Or supply a timed SRT/VTT.</p>
+            <div class="stack">
+              <label class="field"><span>Existing transcript <span class="hint">optional</span></span>
+                <div class="file-field"><input id="transcriptPath" type="text" placeholder="Optional — SRT, VTT or Whisper JSON with timestamps" autocomplete="off"><button class="btn browse" data-kind="transcript" data-target="transcriptPath" type="button">Browse</button></div>
+              </label>
+              <div class="grid-2" id="speechFields">
+                <label class="field"><span>Cloud transcription</span><select id="speechProvider"></select></label>
+                <label class="field"><span>Language</span><select id="speechLanguage"></select></label>
+                <label class="field" style="grid-column:1/-1"><span>Speech API key <span class="hint">used for this import only, never saved</span></span>
+                  <input id="speechKey" type="password" autocomplete="off" placeholder="gsk_… (Groq) or sk-… (OpenAI)">
+                  <span class="err" id="speechKeyErr"></span>
+                  <span class="hint" id="speechHint"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card step">
+          <div class="num" aria-hidden="true">3</div>
+          <div>
+            <h3>Export folder</h3>
+            <p class="lead">Rendered clips and the project file go here. Defaults to a <em>PodcastAI-Exports</em> folder beside the video.</p>
+            <label class="field"><span>Folder <span class="hint">optional</span></span>
+              <div class="file-field"><input id="outputDir" type="text" placeholder="Optional" autocomplete="off"><button class="btn browse" data-kind="folder" data-target="outputDir" type="button">Browse</button></div>
+            </label>
+            <div class="row between" style="margin-top:16px">
+              <span class="muted small" id="importHint">Import runs in the background; you can keep using the app.</span>
+              <button class="btn primary" id="importBtn" type="button"><span class="spin" aria-hidden="true"></span>Import episode</button>
+            </div>
+            <div class="import-status hide" id="importStatus">
+              <div class="row between small"><span id="importStage">Starting…</span><span class="mono" id="importPct">0%</span></div>
+              <div class="progress" style="margin-top:6px"><i id="importBar" style="width:0%"></i></div>
+              <div class="row" style="margin-top:8px"><button class="btn sm danger" id="importCancel" type="button">Cancel import</button></div>
+            </div>
+          </div>
+        </div>
       </div>
-     </div></div>
-   </div>
-  </section>
-  <section class="page" id="page-settings"><div class="page-heading"><div><p class="eyebrow">PRESETS & CONTROLS</p><h1>Make every edit <em>yours.</em></h1><p>Enable only the effects you want for this episode.</p></div></div>
-   <div class="settings-layout"><div class="card settings-card"><label class="field">Editing preset<select id="preset"><option value="simple">Simple — cuts, captions, reframing</option><option value="advanced">Advanced — effects and B-roll</option><option value="custom">Custom — your saved choices</option></select></label><div id="switches"></div><div class="two-fields"><label class="field">Caption font<select id="captionFont"><option>Arial</option><option>Montserrat</option><option>Inter</option><option>Poppins</option><option>Roboto</option><option>Verdana</option><option>Georgia</option></select></label><label class="field">Font size<input type="number" id="captionSize" value="76" min="24" max="130"></label></div>
-     <div class="two-fields"><label class="field">Caption color<input id="captionColor" type="color" value="#ffffff"></label><label class="field">Highlight color<input id="accentColor" type="color" value="#facc15"></label></div>
-     <label class="field">Words on screen at once <input id="captionWords" type="number" min="1" max="12" step="1" value="3"></label>
-     <label class="field">Caption sync offset (seconds)<input type="number" id="captionOffset" step="0.05" min="-10" max="10" value="0"></label>
-     <p class="layout-note">Positive offset delays captions; negative starts them earlier. Use an SRT matched to the exported video.</p>
-     <label class="field">Default caption template<select id="captionStyle"><optgroup label="Animated"><option value="kinetic">Kinetic Pop</option><option value="popline">Word-by-word Pop — needs sync</option><option value="typewriter">Typewriter — needs sync</option><option value="wordbox">Word Box Highlight — needs sync</option><option value="wipe">Karaoke Wipe — needs sync</option><option value="karaoke">Karaoke Fill — needs sync</option><option value="bounce">Bounce In</option><option value="slide">Slide Up</option></optgroup><optgroup label="Static"><option value="boxed">Boxed Impact</option><option value="podcast">Podcast professional</option><option value="editorial">Editorial</option><option value="bold">Modern bold</option><option value="minimal">Minimal clean</option><option value="yellow">Yellow pop</option><option value="highlight">Yellow highlight</option></optgroup></select></label><div class="switchline"><span>Emphasize keywords &amp; numbers in accent color</span><input id="captionEmphasis" type="checkbox"></div><label class="field">AI editing instructions<textarea id="instructions" rows="4" placeholder="e.g. Use B-roll only for actionable examples. Avoid loud sound effects."></textarea></label><button class="btn primary" id="saveConfig">Save editing settings</button></div>
-    <div class="card settings-card"><h2>Export preferences</h2><p class="muted">Choose aspect ratio, resolution and frame rate.</p><div class="aspect-row"><span class="label-small">ASPECT</span><button type="button" class="btn secondary small aspect" data-w="1080" data-h="1920">9:16</button><button type="button" class="btn secondary small aspect" data-w="1080" data-h="1350">4:5</button><button type="button" class="btn secondary small aspect" data-w="1080" data-h="1080">1:1</button><button type="button" class="btn secondary small aspect" data-w="1920" data-h="1080">16:9</button></div><div class="two-fields"><label class="field">Width<input id="renderWidth" type="number" value="1080" min="240" max="3840"></label><label class="field">Height<input id="renderHeight" type="number" value="1920" min="240" max="3840"></label></div><label class="field">Frame rate<select id="renderFPS"><option value="24">24 FPS</option><option value="25">25 FPS</option><option value="30">30 FPS</option><option value="60">60 FPS</option></select></label><div class="switchline"><span>Use NVIDIA GPU hardware encoding, with CPU fallback</span><input id="gpu" type="checkbox" checked></div><div class="notice"><strong>Remotion required</strong><p>Install Node.js and run npm install in the bundled remotion folder. Word-accurate captions require optional WhisperX. Other pending features are documented in the README.</p></div></div></div>
-  </section>
-  <section class="page" id="page-providers"><div class="page-heading"><div><h1>AI <em>connection.</em></h1></div></div><div class="card providers-card"><label class="field">Provider<select id="provider"><option value="chatgpt">ChatGPT Plus / Pro — Sign in with ChatGPT</option><option value="claude-code">Claude Pro / Max — Claude Code login</option><option value="openai">OpenAI API (separate billing)</option><option value="anthropic">Anthropic API (separate billing)</option></select></label><label class="field">Model name<input id="model" list="availableModels" placeholder="Automatic default (or type model ID)"><datalist id="availableModels"></datalist></label><label class="field" id="apiKeyGroup">API key <input id="apiKey" type="password" autocomplete="off" placeholder="Only used for this app session; never saved to project"></label><div class="notice" id="subscriptionNotice"><strong>Use your existing subscriptions</strong><p>ChatGPT sign-in uses OpenAI’s official open-source application authorization. Claude Code uses Anthropic’s own subscription login. API-key options remain available but use separate API billing. Cloud AI receives candidate transcript excerpts, never your podcast video.</p></div>
-<div class="subscription-box hide" id="chatgptConnectBox"><h3>ChatGPT plan connection</h3><p class="muted" id="chatgptStatus">Checking sign-in status…</p><div class="connection-actions"><button class="btn primary" type="button" id="chatgptConnect">Continue with ChatGPT</button><button class="btn secondary" type="button" id="chatgptDisconnect">Disconnect locally</button></div><p class="muted smalltext">Sign in through OpenAI’s website, choose your account and approve plan usage. Eligible requests count toward plan limits. The app stores your session securely on this PC.</p><button class="btn secondary small" type="button" id="chatgptModels">Refresh available models</button></div>
-<div class="subscription-box hide" id="claudeConnectBox"><h3>Claude Pro connection</h3><p id="claudeStatus" class="muted">Checking Claude Code…</p><button class="btn primary" id="claudeLogin" type="button">Open Claude Code login</button><p class="muted smalltext">Requires the official Claude Code app. Install from <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">Anthropic setup</a> and sign in to your Pro account (not Console/API). Anthropic may apply subscription limits or usage credit rules. We do not collect credentials.</p><button class="btn secondary small" id="claudeCheck" type="button">Recheck sign-in</button></div><button class="btn primary" id="applyAI">Use this AI provider</button></div>
-  </section>
-  <section class="page" id="page-exports"><div class="page-heading"><div><p class="eyebrow">OUTPUT</p><h1>Render <em>queue.</em></h1><p>Exports are written only to your chosen folder. Originals are never overwritten.</p></div></div><div class="card"><div class="section-heading"><div><span class="iconbox">↧</span><div><h2>Rendering activity</h2><p>Remotion composition and export progress.</p></div></div><button id="refreshJobs" class="btn secondary">Refresh</button></div><div id="jobList" class="job-list empty-state">No renders yet.</div></div></section>
-  <div id="toast" class="toast hide" role="status"></div>
- </main>
-</div><script src="/app.js" defer></script>
-</body></html>
+    </section>
+
+    <!-- ========== Clips & editor ========== -->
+    <section class="page" id="page-clips" aria-labelledby="h-clips">
+      <div class="page-head"><div><h1 id="h-clips">Clips</h1><p id="clipsLead">Find the strongest standalone moments, then refine each one.</p></div>
+        <div class="row"><button class="btn sm" id="reviewAllBtn" type="button">Review all with AI</button><button class="btn sm" id="renderAllBtn" type="button">Render all selected</button></div>
+      </div>
+      <div class="studio">
+        <!-- Left: find + list -->
+        <div class="stack">
+          <div class="card tight">
+            <div class="card-head"><h3>Find clips</h3><span class="pill" id="providerPill">AI: not set</span></div>
+            <div class="find-bar">
+              <label class="field"><span>How many</span><input type="number" id="clipCount" min="1" max="30" value="6"></label>
+              <label class="field"><span>Min seconds</span><input type="number" id="clipMin" min="10" max="240" value="25"></label>
+              <label class="field"><span>Max seconds</span><input type="number" id="clipMax" min="10" max="240" value="65"></label>
+            </div>
+            <span class="err" id="findErr"></span>
+            <button class="btn primary block" id="analyzeBtn" type="button"><span class="spin" aria-hidden="true"></span>Find best moments</button>
+            <p class="muted small" id="reviewStatus" aria-live="polite" style="margin-top:8px"></p>
+          </div>
+          <div id="clipList" class="clip-list" role="listbox" aria-label="Suggested clips" tabindex="0"></div>
+        </div>
+
+        <!-- Middle: editor -->
+        <div class="card editor" id="editorCard">
+          <div class="empty" id="editorEmpty"><h3>Select a clip</h3><p>Pick a suggested clip to trim it, choose captions and add B-roll.</p></div>
+          <div id="editorForm" class="stack hide">
+            <div class="row between">
+              <h3 id="editorTitle">Clip</h3>
+              <span class="dirty hide" id="dirtyFlag">Unsaved changes</span>
+            </div>
+            <div class="timeline" id="timeline">
+              <div class="ruler"><span id="tlStart">0:00</span><span>drag the handles · <kbd>I</kbd> <kbd>O</kbd> set in/out</span><span id="tlEnd">0:00</span></div>
+              <div class="track" id="track">
+                <div class="cues" id="cueStripes"></div>
+                <div class="sel" id="trimSel"></div>
+                <div class="play" id="playhead" style="left:0"></div>
+                <button class="handle" id="trimStart" type="button" role="slider" aria-label="Clip start" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"></button>
+                <button class="handle" id="trimEnd" type="button" role="slider" aria-label="Clip end" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"></button>
+              </div>
+              <div class="lane-label">B-roll</div>
+              <div class="lane" id="brollLane"></div>
+            </div>
+            <label class="field"><span>Title</span><input id="editTitle" type="text" maxlength="160"></label>
+            <div class="grid-2">
+              <label class="field"><span>Start (s)</span><input id="editStart" type="number" step="0.01" min="0"></label>
+              <label class="field"><span>End (s)</span><input id="editEnd" type="number" step="0.01" min="0"></label>
+            </div>
+            <span class="err" id="boundsErr"></span>
+            <div class="grid-2">
+              <label class="field"><span>Framing</span><select id="editLayout"></select></label>
+              <label class="field"><span>Focus <span class="hint" id="panLabel">50%</span></span><input id="editPan" type="range" min="0" max="100" value="50"></label>
+            </div>
+            <label class="switch"><div>Burn captions into this clip</div><input id="editCaptions" type="checkbox"></label>
+            <div class="grid-2">
+              <label class="field"><span>Caption template</span><select id="editCaptionStyle"></select></label>
+              <label class="field"><span>Callout banner <span class="hint">optional</span></span><input id="editCallout" type="text" maxlength="120" placeholder="e.g. WHY THIS STRATEGY WORKS"></label>
+            </div>
+            <div class="actions">
+              <button class="btn sm" id="aiReviewBtn" type="button"><span class="spin" aria-hidden="true"></span>AI improve clip</button>
+              <button class="btn sm" id="cleanBtn" type="button"><span class="spin" aria-hidden="true"></span>Clean dead air</button>
+              <button class="btn sm" id="transcriptBtn" type="button">Edit transcript</button>
+              <button class="btn sm" id="metaBtn" type="button"><span class="spin" aria-hidden="true"></span>Titles &amp; tags</button>
+            </div>
+            <p class="muted small" id="editorNote" aria-live="polite"></p>
+            <div id="transcriptEditor" class="hide"></div>
+            <div id="metaOutput" class="stack hide"></div>
+
+            <details class="section" id="brollSection">
+              <summary>B-roll overlays <span class="muted small" id="brollCount">0</span></summary>
+              <div class="stack">
+                <div class="broll-list" id="brollList"></div>
+                <label class="field"><span>Local video or image</span>
+                  <div class="file-field"><input id="brollPath" type="text" placeholder="Pick a file…" autocomplete="off"><button class="btn browse" data-kind="asset" data-target="brollPath" type="button">Browse</button></div>
+                </label>
+                <div class="grid-3">
+                  <label class="field"><span>From (s)</span><input id="brollStart" type="number" value="3" min="0" step="0.1"></label>
+                  <label class="field"><span>Length (s)</span><input id="brollDuration" type="number" value="3" min="0.5" step="0.1"></label>
+                  <label class="field"><span>Style</span><select id="brollMode"><option value="cover">Full frame</option><option value="pip">Picture in picture</option></select></label>
+                </div>
+                <button class="btn sm" id="addBrollBtn" type="button">Add overlay</button>
+                <div class="stack" style="border-top:1px solid var(--line);padding-top:12px">
+                  <div class="row between"><strong class="small">Free stock footage</strong><a class="small" href="https://www.pexels.com" target="_blank" rel="noopener">Pexels ↗</a></div>
+                  <label class="field"><span>Pexels API key <span class="hint">session only</span></span><input id="pexelsKey" type="password" autocomplete="off" placeholder="Free key from pexels.com/api"></label>
+                  <div class="file-field"><input id="stockQuery" type="search" placeholder="e.g. people working at computers"><button class="btn" id="stockSearchBtn" type="button"><span class="spin" aria-hidden="true"></span>Search</button></div>
+                  <div class="stock-grid" id="stockResults"></div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <!-- Right: preview -->
+        <div class="card preview">
+          <div class="card-head"><h3>Preview</h3><span class="pill" id="aspectPill">9:16</span></div>
+          <div class="frame-wrap">
+            <div class="frame" id="frame">
+              <video id="previewVideo" playsinline preload="metadata"></video>
+              <div class="cap" id="captionPreview" aria-hidden="true"></div>
+              <div class="placeholder" id="previewPlaceholder">Import an episode to preview clips</div>
+            </div>
+          </div>
+          <div class="transport">
+            <button class="btn sm" id="playBtn" type="button" title="Play / pause (Space)">▶</button>
+            <span class="time" id="previewTime">0:00 / 0:00</span>
+            <span class="grow"></span>
+            <button class="btn primary sm" id="renderBtn" type="button" disabled>Render</button>
+          </div>
+          <p class="muted small" style="margin-top:10px">The preview approximates framing and captions. The render is produced by Remotion.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== Settings ========== -->
+    <section class="page" id="page-settings" aria-labelledby="h-settings">
+      <div class="page-head"><div><h1 id="h-settings">Editing settings</h1><p>Project-wide defaults for captions, effects and export. Saved automatically.</p></div></div>
+      <div class="settings">
+        <div class="card stack">
+          <h3>Captions &amp; effects</h3>
+          <label class="field"><span>Preset</span><select id="preset"><option value="simple">Simple — cuts, captions, reframing</option><option value="advanced">Advanced — effects and B-roll</option><option value="custom">Custom</option></select></label>
+          <div id="switches"></div>
+          <div class="grid-2">
+            <label class="field"><span>Caption font</span><select id="captionFont"></select></label>
+            <label class="field"><span>Font size</span><input type="number" id="captionSize" min="24" max="150"></label>
+            <label class="field"><span>Caption colour</span><input id="captionColor" type="color"></label>
+            <label class="field"><span>Highlight colour</span><input id="accentColor" type="color"></label>
+            <label class="field"><span>Words on screen</span><input id="captionWords" type="number" min="1" max="12" step="1"></label>
+            <label class="field"><span>Caption position <span class="hint" id="posLabel"></span></span><input id="captionPosition" type="range" min="30" max="95" step="1"></label>
+            <label class="field"><span>Default template</span><select id="captionStyle"></select></label>
+            <label class="field"><span>Sync offset (s)</span><input type="number" id="captionOffset" step="0.05" min="-10" max="10"></label>
+          </div>
+          <label class="switch"><div>Emphasise keywords &amp; numbers in the highlight colour</div><input id="captionEmphasis" type="checkbox"></label>
+          <label class="field"><span>AI editing instructions</span><textarea id="instructions" rows="3" placeholder="e.g. Prefer moments that explain a concept end to end. Avoid inside jokes."></textarea></label>
+          <span class="err" id="settingsErr"></span>
+        </div>
+        <div class="stack">
+          <div class="card stack">
+            <h3>Export</h3>
+            <div class="aspect-row" id="aspectRow">
+              <button class="btn sm" type="button" data-w="1080" data-h="1920">9:16</button>
+              <button class="btn sm" type="button" data-w="1080" data-h="1350">4:5</button>
+              <button class="btn sm" type="button" data-w="1080" data-h="1080">1:1</button>
+              <button class="btn sm" type="button" data-w="1920" data-h="1080">16:9</button>
+            </div>
+            <div class="grid-2">
+              <label class="field"><span>Width</span><input id="renderWidth" type="number" min="240" max="3840" step="2"></label>
+              <label class="field"><span>Height</span><input id="renderHeight" type="number" min="240" max="3840" step="2"></label>
+            </div>
+            <label class="field"><span>Frame rate</span><select id="renderFPS"></select></label>
+            <label class="switch"><div>Use NVIDIA hardware encoding when available <small>FFmpeg fallback only</small></div><input id="gpu" type="checkbox"></label>
+          </div>
+          <div class="notice"><strong>Where things live</strong><div id="pathsInfo" class="small" style="margin-top:6px"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== Connections ========== -->
+    <section class="page" id="page-connections" aria-labelledby="h-conn">
+      <div class="page-head"><div><h1 id="h-conn">AI connections</h1><p>Editorial selection and review use text only. Your video never leaves this PC.</p></div></div>
+      <div class="settings">
+        <div class="card stack">
+          <label class="field"><span>Provider</span>
+            <select id="provider">
+              <option value="heuristic">Free local heuristic (no AI)</option>
+              <option value="chatgpt">ChatGPT Plus / Pro — sign in with ChatGPT</option>
+              <option value="claude-code">Claude Pro / Max — Claude Code login</option>
+              <option value="openai">OpenAI API key</option>
+              <option value="anthropic">Anthropic API key</option>
+            </select>
+          </label>
+          <label class="field"><span>Model <span class="hint">leave blank for the default</span></span><input id="model" type="text" list="availableModels" autocomplete="off"><datalist id="availableModels"></datalist></label>
+          <label class="field hide" id="apiKeyField"><span>API key <span class="hint">kept in memory for this session only</span></span><input id="apiKey" type="password" autocomplete="off"></label>
+
+          <div class="provider-box hide" id="chatgptBox">
+            <h3>ChatGPT connection</h3>
+            <p class="dim small" id="chatgptStatus" style="margin:6px 0 12px">Checking…</p>
+            <div class="row wrap">
+              <button class="btn primary sm" id="chatgptConnect" type="button"><span class="spin" aria-hidden="true"></span>Continue with ChatGPT</button>
+              <button class="btn sm" id="chatgptModels" type="button">Refresh models</button>
+              <button class="btn sm danger" id="chatgptDisconnect" type="button">Disconnect</button>
+            </div>
+            <p class="muted small" style="margin-top:10px">Sign in on OpenAI's site and approve plan usage. The session is stored encrypted on this PC and used only by this app.</p>
+          </div>
+          <div class="provider-box hide" id="claudeBox">
+            <h3>Claude connection</h3>
+            <p class="dim small" id="claudeStatus" style="margin:6px 0 12px">Checking…</p>
+            <div class="row wrap">
+              <button class="btn primary sm" id="claudeLogin" type="button">Open Claude Code login</button>
+              <button class="btn sm" id="claudeCheck" type="button">Recheck</button>
+            </div>
+            <p class="muted small" style="margin-top:10px">Requires the official <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">Claude Code</a> CLI signed in with a Pro or Max subscription.</p>
+          </div>
+          <button class="btn primary" id="applyProviderBtn" type="button">Use this provider</button>
+        </div>
+        <div class="notice">
+          <strong>What each option needs</strong>
+          <ul class="small dim" style="margin:8px 0 0;padding-left:18px;line-height:1.7">
+            <li><b>Heuristic</b>: no account. Ranks passages by hook phrases and length.</li>
+            <li><b>ChatGPT</b>: a Plus or Pro subscription. Uses OpenAI's documented app authorisation.</li>
+            <li><b>Claude</b>: a Pro or Max subscription through the Claude Code CLI.</li>
+            <li><b>API keys</b>: pay-as-you-go billing with OpenAI or Anthropic.</li>
+          </ul>
+          <p class="small muted" style="margin-top:10px">Cloud transcription (Groq or OpenAI Whisper) is separate and configured on the Import page.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== Queue ========== -->
+    <section class="page" id="page-queue" aria-labelledby="h-queue">
+      <div class="page-head"><div><h1 id="h-queue">Render queue</h1><p>Exports are written to your export folder. Source files are never overwritten.</p></div>
+        <button class="btn sm" id="refreshJobsBtn" type="button">Refresh</button></div>
+      <div class="card" id="jobList"><div class="empty">No jobs yet.</div></div>
+    </section>
+  </main>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<dialog id="confirmDialog"><h3 id="confirmTitle"></h3><p id="confirmBody"></p><div class="actions"><button class="btn" id="confirmNo" type="button">Cancel</button><button class="btn primary" id="confirmYes" type="button">Confirm</button></div></dialog>
+<dialog id="videoDialog" class="wide"><div class="row between" style="margin-bottom:10px"><h3 id="videoDialogTitle">Rendered clip</h3><button class="btn ghost sm" id="videoDialogClose" type="button">Close</button></div><video id="videoDialogPlayer" controls playsinline></video></dialog>
+
+<script type="module" src="/js/main.js"></script>
+</body>
+</html>

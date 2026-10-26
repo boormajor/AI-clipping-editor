@@ -1,0 +1,24 @@
+{
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 7.2,
+      "text": "The biggest mistake people make in marketing is assuming that more traffic automatically means more sales."
+    },
+    {
+      "start": 7.2,
+      "end": 14.0,
+      "text": "Actually, what matters is attracting people who already understand the problem and are ready to act."
+    },
+    {
+      "start": 14.0,
+      "end": 22.0,
+      "text": "If you only optimize for clicks, you can easily miss the customers that will make your business grow."
+    },
+    {
+      "start": 22.0,
+      "end": 30.0,
+      "text": "Start by finding the questions your best customers ask right before they buy, and answer those questions directly."
+    }
+  ]
+}

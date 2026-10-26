@@ -1,57 +1,116 @@
-# Podcast AI Studio — Online Speech + Remotion (Alpha)
+# Podcast AI Studio
 
-A Windows-first podcast clipping editor. Import a video, transcribe it online with **real word timestamps**, select clips using ChatGPT or Claude, customize captions and render with Remotion.
+Turn a long podcast recording into captioned, vertical short-form clips on Windows — with real word-level caption timing, editorial clip selection by ChatGPT or Claude, and a Remotion-powered renderer.
 
-**Alpha:** editorial review and dynamic framing are not perfect. Always watch the rendered MP4 before publishing. The preview panel shows a simplified source preview rather than the final animated Remotion composition.
+[![CI](https://github.com/boormajor/AI-clipping-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/boormajor/AI-clipping-editor/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/boormajor/AI-clipping-editor?display_name=tag)](https://github.com/boormajor/AI-clipping-editor/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+- **Import** an MP4/MOV/MKV. Audio is transcribed through Groq or OpenAI Whisper with measured word timestamps (or bring your own timed SRT/VTT).
+- **Find clips** with the local heuristic or let ChatGPT / Claude pick standalone moments and title them.
+- **Edit** each clip: trim on a timeline, choose framing (single speaker, split, AI shot plan), pick from 15 caption templates, add B-roll from local files or free Pexels footage, clean dead air, generate titles and tags.
+- **Render** 9:16, 4:5, 1:1 or 16:9 MP4s with Remotion. FFmpeg takes over automatically if Remotion is unavailable.
+- **Local by design.** A localhost-only server, a per-launch session token, and nothing uploaded except the audio or transcript excerpts you send to the AI services you choose.
+
+![Clips and editor](docs/screenshots/clips.png)
+
+## Requirements
+
+| | |
+|---|---|
+| OS | Windows 10 21H2 or later, 64-bit (macOS/Linux work from source; the native file picker is Windows-only) |
+| Runtime | FFmpeg and Node.js 18+ — the installer fetches both with `winget` |
+| Hardware | 8 GB RAM; an NVIDIA GPU speeds up the FFmpeg fallback only |
+| Accounts | A speech API key (Groq free tier or OpenAI) for transcription; optionally ChatGPT Plus/Pro, Claude Pro/Max, or an OpenAI/Anthropic API key for editorial AI |
 
 ## Install
 
-1. Open [GitHub Actions](https://github.com/boormajor/AI-clipping-editor/actions), select the most recent **successful** Windows build, and download the `PodcastAIStudio-Windows-x64-alpha` artifact.
-2. Extract the **entire** ZIP, including the `remotion/` and `scripts/` folders.
-3. Double-click `Install-and-Run.bat`. Setup installs/checks **FFmpeg**, **Node.js**, and **Remotion**. No Ollama, WhisperX, or local AI model is installed or downloaded. Keep the console open while editing.
+1. Download `PodcastAIStudio-<version>-windows-x64.zip` from the [latest release](https://github.com/boormajor/AI-clipping-editor/releases/latest) and verify it against `SHA256SUMS.txt` if you like.
+2. Extract the **entire** ZIP to a folder you own (for example `C:\Apps\PodcastAIStudio`), not `Program Files`.
+3. Double-click **`Install-and-Run.bat`**. The first run installs FFmpeg, Node.js and the Remotion dependencies (a few minutes); later runs start in seconds. Keep the console window open while you work — it prints the address to open if the app window does not appear.
 
-## Transcribe video without an SRT
+> **Windows SmartScreen** may warn that the executable is unrecognised because the build is not code-signed yet. Choose *More info → Run anyway* after verifying the checksum.
 
-1. In **Studio**, select the podcast MP4/MOV/MKV file. **Leave Transcript empty.**
-2. Under **Cloud transcription**, choose:
-   - **Groq Whisper** (cloud developer API; free tier may be available subject to limits): get a key at [console.groq.com](https://console.groq.com/keys).
-   - **OpenAI Whisper API** (separate pay-as-you-go API billing): get a key from [platform.openai.com](https://platform.openai.com/api-keys).
-3. Paste the selected provider's speech API key into the app. This key is used only for the import request and is not written into your project JSON. Choose language or Automatic.
-4. Choose export folder and click **Import episode**. The app extracts compressed audio with FFmpeg, divides long files into overlapping chunks, transcribes those chunks through the selected hosted API, and assembles the returned measured word timestamps.
-5. Click **Find best moments**. Choose ChatGPT or Claude for editorial selection in **AI Connections** (your existing plan sign-in, where eligible). These providers evaluate *text*; the separate speech service is needed to transcribe the audio.
+## Workflow
 
-**Important:** ChatGPT Plus and Claude Pro subscriptions do not supply a general Groq/OpenAI audio-transcription API key. You need to create a separate speech API key. Free Groq tier is subject to availability and usage limits.
+1. **Import.** Choose the video. Leave *Transcript* empty and paste a Groq or OpenAI speech key for word-accurate captions, or point at a timed SRT/VTT. Import runs in the background with progress and can be cancelled.
+2. **Find clips.** Set how many clips and the length range. With the heuristic you get ranked passages; with an AI provider connected you get titled, context-checked moments.
+3. **Edit.** Drag the in/out handles (or press <kbd>I</kbd>/<kbd>O</kbd> at the playhead), set framing and focus, pick a caption template, add overlays. Edits save automatically.
+4. **Render.** Renders run one at a time in the queue. Finished files land in your export folder (`PodcastAI-Exports` beside the video unless you chose another).
+5. **Save the project** (<kbd>Ctrl</kbd>+<kbd>S</kbd>) to keep the transcript, clips and settings as a `.project.json` you can reopen later.
 
-An existing timestamped SRT/VTT can still be imported optionally. That path doesn't automatically create per-word timestamps.
+### Keyboard shortcuts (Clips page)
 
-## Control captions
+| Key | Action |
+|---|---|
+| <kbd>Space</kbd> / <kbd>K</kbd> | Play / pause the preview |
+| <kbd>J</kbd> / <kbd>L</kbd> | Skip back / forward 5 s |
+| <kbd>←</kbd> / <kbd>→</kbd> | Nudge 0.1 s (<kbd>Shift</kbd> for 1 s) |
+| <kbd>I</kbd> / <kbd>O</kbd> | Set clip start / end at the playhead |
+| <kbd>↑</kbd> / <kbd>↓</kbd> in the clip list | Select the previous / next clip |
+| <kbd>Ctrl</kbd>+<kbd>S</kbd> | Save the project file |
 
-Open **Editing settings** and change **Words on screen at once** to any value from **1 to 12**. The default is **3 words**. This is the **maximum** words in a Remotion caption group; natural speech pauses and duration limits can make a group shorter.
+## Captions
 
-The generated speech transcript includes measured start/end times for every word, so karaoke/pop/highlight effects can follow the speech. This improves timing but audio recognition can still make mistakes, particularly names and technical terminology. Correct recognized text in the editor when necessary.
+Transcription returns a measured start and end time for every word, so word-by-word templates (karaoke wipe, pop, box highlight, typewriter…) follow the speech exactly. The app never interpolates or invents word timings: when only a cue-level SRT is available, those templates show whole cues with the group animation instead.
 
-Other options include caption style (kinetic, karaoke, boxed, word-box, typewriter, etc.), font, size, emphasis, primary and accent colors, framing, and aspect ratio.
+*Editing settings* controls the font, size, colours, how many words appear at once (1–12), the vertical position, keyword emphasis and a sync offset. Fonts are fetched from Google Fonts at render time; if the machine is offline the renderer retries with Arial.
 
-## Architecture
+## AI providers
 
-- **Go** local Windows launcher and project API.
-- **Remotion** required motion-caption and video composition engine (FFmpeg fallback remains available for failures).
-- **FFmpeg** audio extraction and video pre-processing.
-- **Groq Whisper or OpenAI Whisper API** remote speech recognition with real word timestamps.
-- **ChatGPT / Claude** for transcript-based clip selection and editorial review through supported authenticated connections.
-- No Ollama local model or WhisperX setup.
+| Provider | What it needs | Used for |
+|---|---|---|
+| Local heuristic | Nothing | Ranking passages by hook phrases and length |
+| ChatGPT Plus / Pro | Sign in with ChatGPT (OpenAI's documented app authorisation; the session is stored encrypted with Windows DPAPI) | Clip selection, editorial review, titles & tags |
+| Claude Pro / Max | The official [Claude Code](https://code.claude.com/docs/en/setup) CLI, signed in with your subscription | Same |
+| OpenAI / Anthropic API | A pay-as-you-go API key (kept in memory for the session) | Same |
 
-Cloud transcription sends **audio excerpts of your video to the selected speech service**. Online editorial AI receives transcript excerpts. Check your cloud provider's privacy terms and API pricing.
+Editorial AI only ever receives transcript text. Cloud transcription receives compressed audio excerpts. Nothing else leaves your PC.
 
-This release does **not** autonomously watch and rework every rendered frame. It is still under active development.
+## Where data lives
 
-## Developer checks
+| Item | Location |
+|---|---|
+| Rendered clips, project files, downloaded stock footage | Your export folder (default `PodcastAI-Exports` beside the video) |
+| Last project, job history, transcription cache, logs | `%APPDATA%\PodcastAIStudio` (`studio.log`, `logs\<job>.log`) |
+| ChatGPT session | `%APPDATA%\PodcastAIStudio\chatgpt-profile.dat` (DPAPI-encrypted) — delete it or click *Disconnect* to sign out |
+| Setup log | `%LOCALAPPDATA%\PodcastAIStudio\setup.log` |
 
-```bash
-go test ./...
-cd remotion
-npm ci
-npx tsc --noEmit
+Uninstall by deleting the extracted folder and `%APPDATA%\PodcastAIStudio`.
+
+## Troubleshooting
+
+| Symptom | What to do |
+|---|---|
+| "winget is not available" during setup | Install FFmpeg and Node.js manually (links are printed), then run `Install-and-Run.bat` again |
+| The app window does not open | Open the `http://127.0.0.1:…/session?token=…` address printed in the console in Edge or Chrome |
+| "This tab is not linked to the running app" | The tab was opened without the session link; use the printed address |
+| Renders say **FFmpeg** in the queue | Remotion failed (details in *Show log*). Usually Node or `npm ci` is missing — rerun setup. The FFmpeg fallback burns cue-level captions without word animation |
+| Transcription fails with HTTP 401/403 | The speech key is wrong or for the other provider. ChatGPT/Claude subscriptions are not speech keys |
+| Transcription is slow | Episodes are split into ~8-minute parts uploaded two at a time; results are cached, so re-importing is instant |
+| Port already in use | Start with `PodcastAIStudio.exe -port 0` (the default) or any free port |
+
+Logs for every job are kept under `%APPDATA%\PodcastAIStudio\logs`.
+
+## Command-line options
+
+```
+PodcastAIStudio.exe [-port N] [-no-browser] [-state-dir PATH] [-remotion PATH] [-log-level debug] [-version]
 ```
 
-The Windows build is created by the repository's GitHub Actions workflow.
+`-no-token` disables the session token and is intended only for local development.
+
+## Developing
+
+```bash
+go test -race ./...                       # backend
+cd remotion && npm ci && npm run typecheck && npm run smoke   # renderer
+node scripts/check-ui-ids.mjs             # front end
+go run ./cmd/studio -remotion ./remotion -no-token   # run locally
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together and [docs/API.md](docs/API.md) for the local HTTP API. Releases are produced by the `Release` workflow when a `v*` tag is pushed.
+
+## Licensing
+
+Podcast AI Studio is MIT licensed. It depends on [Remotion](https://remotion.dev), which is free for individuals and small teams but requires a company licence above that threshold, and on FFmpeg, which you install separately. See [NOTICE.md](NOTICE.md).

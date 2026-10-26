@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/big"
 	"net"
 	"net/http"
@@ -27,7 +28,6 @@ import (
 
 const openAIAuthBase = "https://auth.openai.com"
 const openAIResource = "https://api.openai.com/v1"
-const openAIEndpoint = "https://api.openai.com/v1"
 
 type chatProfile struct {
 	HostID       string    `json:"host_id"`
@@ -57,6 +57,7 @@ type chatAuth struct {
 	errorText  string
 	storage    string
 	httpClient *http.Client
+	log        *slog.Logger
 }
 
 func randomURLBytes(n int) (string, error) {
@@ -75,22 +76,34 @@ func makeHostID() (string, error) {
 	b[8] = (b[8] & 0x3f) | 0x80
 	return fmt.Sprintf("urn:uuid:%x-%x-%x-%x-%x", b[:4], b[4:6], b[6:8], b[8:10], b[10:]), nil
 }
-func newChatAuth() (*chatAuth, error) {
-	d, err := os.UserConfigDir()
-	if err != nil {
+
+// newChatAuth loads the saved ChatGPT profile from the state folder. A file
+// that cannot be decrypted or parsed is set aside (renamed .corrupt) rather
+// than preventing the app from starting; the user simply signs in again.
+func newChatAuth(stateDir string, logger *slog.Logger) (*chatAuth, error) {
+	var err error
+	if stateDir == "" {
+		d, e := os.UserConfigDir()
+		if e != nil {
+			return nil, e
+		}
+		stateDir = filepath.Join(d, "PodcastAIStudio")
+	}
+	if err = os.MkdirAll(stateDir, 0o700); err != nil {
 		return nil, err
 	}
-	directory := filepath.Join(d, "PodcastAIStudio")
-	if err = os.MkdirAll(directory, 0700); err != nil {
-		return nil, err
+	if logger == nil {
+		logger = slog.Default()
 	}
-	a := &chatAuth{storage: filepath.Join(directory, "chatgpt-profile.dat"), httpClient: &http.Client{Timeout: 45 * time.Second}}
+	a := &chatAuth{storage: filepath.Join(stateDir, "chatgpt-profile.dat"), httpClient: &http.Client{Timeout: 45 * time.Second}, log: logger}
 	if b, e := os.ReadFile(a.storage); e == nil {
 		if b, e = unprotectAccount(b); e != nil {
-			return nil, fmt.Errorf("could not decrypt saved ChatGPT account: %w", e)
-		}
-		if e = json.Unmarshal(b, &a.profile); e != nil {
-			return nil, fmt.Errorf("invalid saved ChatGPT account: %w", e)
+			logger.Warn("saved ChatGPT account could not be decrypted; sign in again", "error", e)
+			_ = os.Rename(a.storage, a.storage+".corrupt")
+		} else if e = json.Unmarshal(b, &a.profile); e != nil {
+			logger.Warn("saved ChatGPT account is unreadable; sign in again", "error", e)
+			_ = os.Rename(a.storage, a.storage+".corrupt")
+			a.profile = chatProfile{}
 		}
 	} else if !errors.Is(e, os.ErrNotExist) {
 		return nil, e
@@ -243,6 +256,15 @@ func (a *chatAuth) start() (string, error) {
 }
 func (a *chatAuth) setError(s string) { a.mu.Lock(); a.errorText = s; a.mu.Unlock() }
 
+// tokenLifetime converts an expires_in value, defaulting to an hour when the
+// server omits it so the token is not treated as already expired.
+func tokenLifetime(expiresIn int) time.Duration {
+	if expiresIn <= 0 {
+		return time.Hour
+	}
+	return time.Duration(expiresIn) * time.Second
+}
+
 type oauthToken struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -308,7 +330,7 @@ func (a *chatAuth) finish(p *oauthPending, clientID, code string) {
 	a.profile.AccessToken = t.AccessToken
 	a.profile.RefreshToken = t.RefreshToken
 	a.profile.Scope = t.Scope
-	a.profile.Expiry = time.Now().Add(time.Duration(t.ExpiresIn) * time.Second)
+	a.profile.Expiry = time.Now().Add(tokenLifetime(t.ExpiresIn))
 	if e = a.saveLocked(); e != nil {
 		a.errorText = "Could not save the authenticated profile: " + e.Error()
 	} else {
@@ -341,7 +363,7 @@ func (a *chatAuth) accessToken(ctx context.Context) (string, error) {
 	if t.IDToken != "" {
 		a.profile.IDToken = t.IDToken
 	}
-	a.profile.Expiry = time.Now().Add(time.Duration(t.ExpiresIn) * time.Second)
+	a.profile.Expiry = time.Now().Add(tokenLifetime(t.ExpiresIn))
 	if e = a.saveLocked(); e != nil {
 		return "", e
 	}
@@ -352,7 +374,7 @@ func (a *chatAuth) models(ctx context.Context) ([]map[string]string, error) {
 	if e != nil {
 		return nil, e
 	}
-	req, e := http.NewRequestWithContext(ctx, "GET", openAIEndpoint+"/models", nil)
+	req, e := http.NewRequestWithContext(ctx, "GET", openAIResource+"/models", nil)
 	if e != nil {
 		return nil, e
 	}

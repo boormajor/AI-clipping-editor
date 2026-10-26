@@ -53,14 +53,14 @@ func TestFFmpegRender(t *testing.T) {
 	}
 	p := Project{VideoPath: video, OutputDir: filepath.Join(dir, "exports"), Duration: 4, Cues: []Cue{{0, 2, "This is our first caption"}, {2, 4, "Our second informative caption"}}, Config: Config{Width: 360, Height: 640, FPS: 25, Captions: true, Reframe: true, Graphics: false}}
 	c := Clip{ID: "clip-01", Start: 0, End: 4, Pan: .5, Captions: true, CaptionStyle: "bold"}
-	path, debug, err := Render(context.Background(), p, c)
+	path, debug, err := Render(context.Background(), p, c, "job1234abcd")
 	if err != nil {
 		t.Fatalf("render: %v\n%s", err, debug)
 	}
 	if _, err = os.Stat(path); err != nil {
 		t.Fatal(err)
 	}
-	duration, err := Probe(path)
+	duration, err := Probe(context.Background(), path)
 	if err != nil || duration < 3.5 {
 		t.Fatalf("output duration %f err %v", duration, err)
 	}
@@ -80,7 +80,7 @@ func TestBrollOverlay(t *testing.T) {
 	}
 	p := Project{VideoPath: file, OutputDir: dir, Duration: 3, Cues: []Cue{{0, 3, "Test subtitle on top of B-roll"}}, Config: Config{Width: 360, Height: 640, FPS: 25, Broll: true, Captions: true, Graphics: true}}
 	c := Clip{ID: "brolltest", Start: 0, End: 3, Pan: .5, Captions: true, Callout: "SEO TIPS", Broll: []Broll{{Path: broll, Start: .5, Duration: 1.5}}}
-	_, debug, e := Render(context.Background(), p, c)
+	_, debug, e := Render(context.Background(), p, c, "job")
 	if e != nil {
 		t.Fatalf("Broll failed: %v\n%s", e, debug)
 	}
@@ -142,7 +142,7 @@ func TestDualSpeakerRender(t *testing.T) {
 	cfg.GPU = false
 	p := Project{VideoPath: src, OutputDir: filepath.Join(dir, "out"), Duration: 2, Cues: []Cue{{Start: 0, End: 2, Text: "Testing dual person layout"}}, Config: cfg}
 	c := Clip{ID: "dual", Start: 0, End: 2, Layout: "two-up", Captions: true, CaptionStyle: "minimal"}
-	rendered, logs, err := Render(context.Background(), p, c)
+	rendered, logs, err := Render(context.Background(), p, c, "job")
 	if err != nil {
 		t.Fatalf("render failed: %v %s", err, logs)
 	}

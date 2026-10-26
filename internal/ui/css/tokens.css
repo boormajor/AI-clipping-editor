@@ -1,0 +1,67 @@
+/* Design tokens: one place for colour, type, spacing and motion. */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg: #0b0e14;
+  --bg-elev: #11151d;
+  --panel: #161b25;
+  --panel-2: #1c2230;
+  --line: #262d3b;
+  --line-strong: #344057;
+
+  /* Text */
+  --fg: #e9edf5;
+  --fg-dim: #aab4c6;
+  --fg-mute: #7f8aa0;
+
+  /* Brand + semantics */
+  --accent: #8b7cff;
+  --accent-strong: #a89bff;
+  --accent-soft: rgba(139, 124, 255, 0.16);
+  --ok: #3dd68c;
+  --warn: #f5b942;
+  --danger: #ff6b6b;
+  --danger-soft: rgba(255, 107, 107, 0.14);
+  --info: #5bb0ff;
+
+  /* Type */
+  --font: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "Consolas", Menlo, monospace;
+  --fs-xs: 11.5px;
+  --fs-sm: 12.5px;
+  --fs: 14px;
+  --fs-md: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 24px;
+
+  /* Shape + spacing */
+  --r-sm: 6px;
+  --r: 10px;
+  --r-lg: 16px;
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 28px;
+  --s-7: 40px;
+
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+
+  --rail-w: 220px;
+  --topbar-h: 56px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --fast: 140ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --fast: 0ms;
+  }
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

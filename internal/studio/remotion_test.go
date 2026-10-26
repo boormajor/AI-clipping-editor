@@ -27,13 +27,13 @@ func TestRemotionSourcePropsRealCueBoundaries(t *testing.T) {
 		t.Fatal("default color failed")
 	}
 }
-func TestRenderRemotionNeverFallsBackToFFmpeg(t *testing.T) {
+func TestRenderRemotionRequiresInstall(t *testing.T) {
 	if RemotionInstalled() {
 		t.Skip("Requires a real source video after Remotion dependencies installed")
 	}
 	p := Project{Duration: 10, Config: Defaults()}
-	c := Clip{Start: 0, End: 4}
-	_, _, err := RenderRemotion(context.Background(), p, c, nil)
+	c := Clip{ID: "clip-01", Start: 0, End: 4, Layout: "focus"}
+	_, _, err := RenderRemotion(context.Background(), p, c, "job", nil)
 	if err == nil {
 		t.Fatal("Remotion render must require Node dependencies")
 	}
@@ -43,9 +43,9 @@ func TestRenderRemotionNeverFallsBackToFFmpeg(t *testing.T) {
 }
 func TestUnsafeCaptionColorsAndShotBounds(t *testing.T) {
 	p := Project{Duration: 60, Config: Defaults()}
-	p.Config.CaptionColor = "red;evil"
+	p.Config.CaptionColor = "red;evil" // Normalize replaces invalid colours with the default
 	p.Config.AccentColor = "#f0aaff"
-	c := Clip{Start: 1, End: 16, Shots: []Shot{{Start: 0, End: 20, Mode: "both"}}}
+	c := Clip{ID: "clip-02", Start: 1, End: 16, Layout: "dynamic", Shots: []Shot{{Start: 0, End: 20, Mode: "both"}}}
 	props, err := makeRemotionProps(p, c)
 	if err == nil {
 		t.Fatalf("should reject out of bounds shots: %#v", props)

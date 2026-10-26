@@ -1,17 +1,45 @@
-# Executables and local generated outputs
+# Build outputs
 *.exe
 *.zip
+dist/
+build/
+out/
+remotion/out/
+
+# Local media and generated project files
 *.mp4
 *.mov
+*.mkv
+*.webm
+*.m4a
+*.mp3
 *.wav
+*.aac
 *.project.json
-.DS_Store
+*.log
+
+# Secrets (never commit)
 .env
+.env.*
+*.key
+*.pem
+credentials*.json
 
 # Dependencies and local environments
 node_modules/
 .quality-venv/
+.venv/
+__pycache__/
+*.pyc
 
 # Remotion staged render jobs (keep the folder, not its contents)
 remotion/public/jobs/*
 !remotion/public/jobs/.gitkeep
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.tmp

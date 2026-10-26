@@ -69,7 +69,7 @@ func askClaudeCode(ctx context.Context, prompt string) (string, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("Claude Code failed: %w; %s", err, truncate(stderr.String(), 350))
+		return "", fmt.Errorf("Claude Code failed: %w; %s", err, Head(stderr.String(), 350))
 	}
 	var response struct {
 		IsError bool     `json:"is_error"`
@@ -80,7 +80,7 @@ func askClaudeCode(ctx context.Context, prompt string) (string, error) {
 		return "", fmt.Errorf("Claude returned invalid JSON output: %w", err)
 	}
 	if response.IsError {
-		return "", fmt.Errorf("Claude error: %s", truncate(strings.Join(response.Errors, "; ")+" "+response.Result, 500))
+		return "", fmt.Errorf("Claude error: %s", Head(strings.Join(response.Errors, "; ")+" "+response.Result, 500))
 	}
 	if strings.TrimSpace(response.Result) == "" {
 		return "", errors.New("Claude returned an empty result")
